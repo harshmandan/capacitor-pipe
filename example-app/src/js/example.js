@@ -1,4 +1,4 @@
-import { NPE } from 'npe-capacitor';
+import { NPE } from 'capacitor-npe';
 
 window.extractYouTubeStreams = async () => {
     const videoUrl = document.getElementById("videoUrlInput").value || "https://www.youtube.com/watch?v=kJQP7kiw5Fk";

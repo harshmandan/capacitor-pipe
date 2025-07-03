@@ -24,7 +24,7 @@ npx cap sync
 ### extractStreamInfo(...)
 
 ```typescript
-extractStreamInfo(options: { videoUrl: string; }) => Promise<StreamInfoResult>
+extractStreamInfo(options: { videoUrl: string; }) => any
 ```
 
 Extract YouTube video stream information
@@ -33,7 +33,7 @@ Extract YouTube video stream information
 | ------------- | ---------------------------------- | ----------------------- |
 | **`options`** | <code>{ videoUrl: string; }</code> | - The video URL options |
 
-**Returns:** <code>Promise&lt;<a href="#streaminforesult">StreamInfoResult</a>&gt;</code>
+**Returns:** <code>any</code>
 
 --------------------
 
@@ -43,11 +43,11 @@ Extract YouTube video stream information
 
 #### StreamInfoResult
 
-| Prop             | Type                                                                                                                                                                                                    |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`success`**    | <code>boolean</code>                                                                                                                                                                                    |
-| **`error`**      | <code>string</code>                                                                                                                                                                                     |
-| **`streamInfo`** | <code>{ title: string; duration: number; uploader: string; viewCount: number; thumbnailUrl: string; videoStreams: VideoStream[]; audioStreams: AudioStream[]; videoOnlyStreams: VideoStream[]; }</code> |
+| Prop             | Type                                                                                                                                                                   |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`success`**    | <code>boolean</code>                                                                                                                                                   |
+| **`error`**      | <code>string</code>                                                                                                                                                    |
+| **`streamInfo`** | <code>{ title: string; duration: number; uploader: string; viewCount: number; thumbnailUrl: string; videoStreams: {}; audioStreams: {}; videoOnlyStreams: {}; }</code> |
 
 
 #### VideoStream

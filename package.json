@@ -1,7 +1,7 @@
 {
   "name": "capacitor-npe",
   "version": "2.4.6",
-  "description": "NPE Wrapper that allows you to call the Java APIs for NPE",
+  "description": "NPE Wrapper for capacitor. Allows you to call the Java APIs asynchronously as a plugin. Only works on Android. Fully typed.",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
