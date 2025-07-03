@@ -1,7 +1,7 @@
 {
   "name": "@capacitor-community/npe",
-  "version": "0.0.1",
-  "description": "NPE Wrapper that allows you to call the Java APIs",
+  "version": "2.4.6",
+  "description": "NPE Wrapper that allows you to call the Java APIs for NPE",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
@@ -10,12 +10,10 @@
     "android/src/main/",
     "android/build.gradle",
     "dist/",
-    "ios/Sources",
-    "ios/Tests",
-    "Package.swift",
-    "CapacitorCommunityNpe.podspec"
+    "Package.swift"
   ],
   "author": "Harsh Mandan",
+  "url": "https://harsh.ink",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -30,15 +28,13 @@
     "native"
   ],
   "scripts": {
-    "verify": "npm run verify:ios && npm run verify:android && npm run verify:web",
-    "verify:ios": "xcodebuild -scheme CapacitorCommunityNpe -destination generic/platform=iOS",
+    "verify": "npm run verify:android && npm run verify:web",
     "verify:android": "cd android && ./gradlew clean build test && cd ..",
     "verify:web": "npm run build",
     "lint": "npm run eslint && npm run prettier -- --check && npm run swiftlint -- lint",
     "fmt": "npm run eslint -- --fix && npm run prettier -- --write && npm run swiftlint -- --fix --format",
     "eslint": "eslint . --ext ts",
     "prettier": "prettier \"**/*.{css,html,ts,js,java}\" --plugin=prettier-plugin-java",
-    "swiftlint": "node-swiftlint",
     "docgen": "docgen --api NPEPlugin --output-readme README.md --output-json dist/docs.json",
     "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.mjs",
     "clean": "rimraf ./dist",
@@ -49,7 +45,6 @@
     "@capacitor/android": "^7.0.0",
     "@capacitor/core": "^7.0.0",
     "@capacitor/docgen": "^0.3.0",
-    "@capacitor/ios": "^7.0.0",
     "@ionic/eslint-config": "^0.4.0",
     "@ionic/prettier-config": "^4.0.0",
     "@ionic/swiftlint-config": "^2.0.0",
@@ -58,21 +53,16 @@
     "prettier-plugin-java": "^2.6.6",
     "rimraf": "^6.0.1",
     "rollup": "^4.30.1",
-    "swiftlint": "^2.0.0",
     "typescript": "~4.1.5"
   },
   "peerDependencies": {
     "@capacitor/core": ">=7.0.0"
   },
   "prettier": "@ionic/prettier-config",
-  "swiftlint": "@ionic/swiftlint-config",
   "eslintConfig": {
     "extends": "@ionic/eslint-config/recommended"
   },
   "capacitor": {
-    "ios": {
-      "src": "ios"
-    },
     "android": {
       "src": "android"
     }

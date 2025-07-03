@@ -1,10 +1,13 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type { NPEPlugin } from './definitions';
+import type { NPEPlugin, StreamInfoResult } from './definitions';
 
 export class NPEWeb extends WebPlugin implements NPEPlugin {
-  async echo(options: { value: string }): Promise<{ value: string }> {
-    console.log('ECHO', options);
-    return options;
+  async extractStreamInfo(options: { videoUrl: string }): Promise<StreamInfoResult> {
+    console.log('NPE Web - extractStreamInfo not implemented for web platform', options);
+    return {
+      success: false,
+      error: 'NPE plugin is only available on Android platform',
+    };
   }
 }
