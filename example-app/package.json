@@ -21,6 +21,7 @@
     "@capacitor/cli": "latest",
     "vite": "^5.4.2"
   },
+  "packageManager": "pnpm@10.11.0",
   "author": "",
   "license": "ISC"
 }

@@ -66,5 +66,6 @@
     "android": {
       "src": "android"
     }
-  }
+  },
+  "packageManager": "pnpm@10.11.0"
 }
