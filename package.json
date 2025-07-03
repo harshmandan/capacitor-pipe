@@ -1,5 +1,5 @@
 {
-  "name": "@capacitor-community/npe",
+  "name": "capacitor-npe",
   "version": "2.4.6",
   "description": "NPE Wrapper that allows you to call the Java APIs for NPE",
   "main": "dist/plugin.cjs.js",

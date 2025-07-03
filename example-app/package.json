@@ -14,8 +14,8 @@
   },
   "dependencies": {
     "@capacitor/core": "latest",
-    "@capacitor-community/npe": "file:..",
-    "@capacitor/android": "7.0.0"
+    "@capacitor/android": "7.0.0",
+    "capacitor-npe": "file:.."
   },
   "devDependencies": {
     "@capacitor/cli": "latest",

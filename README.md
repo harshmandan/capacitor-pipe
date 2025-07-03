@@ -1,11 +1,11 @@
-# @capacitor-community/npe
+# capacitor-npe
 
 NPE Wrapper that allows you to call the Java APIs for NPE
 
 ## Install
 
 ```bash
-npm install @capacitor-community/npe
+npm install capacitor-npe
 npx cap sync
 ```
 
