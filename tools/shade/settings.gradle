@@ -1,0 +1,26 @@
+/*
+ * Standalone helper build that relocates NewPipeExtractor into a private
+ * namespace so it can sit on the same classpath as PipePipeExtractor.
+ *
+ * The two extractors are hard forks of each other and both occupy
+ * org.schabi.newpipe.extractor, right down to a class literally named
+ * `NewPipe` holding a *global static* downloader. Without relocation one
+ * silently shadows the other; there is no "both loaded" state to fall back
+ * between. See CLAUDE.md.
+ */
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        mavenCentral()
+        maven { url = uri('https://jitpack.io') }
+    }
+}
+
+rootProject.name = 'pipe-shade'

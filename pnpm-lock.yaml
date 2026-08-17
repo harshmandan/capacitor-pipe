@@ -9,11 +9,11 @@ importers:
   .:
     devDependencies:
       '@capacitor/android':
-        specifier: ^7.0.0
-        version: 7.4.0(@capacitor/core@7.4.0)
+        specifier: ^8.5.0
+        version: 8.5.0(@capacitor/core@8.5.0)
       '@capacitor/core':
-        specifier: ^7.0.0
-        version: 7.4.0
+        specifier: ^8.5.0
+        version: 8.5.0
       '@capacitor/docgen':
         specifier: ^0.3.0
         version: 0.3.0
@@ -23,9 +23,6 @@ importers:
       '@ionic/prettier-config':
         specifier: ^4.0.0
         version: 4.0.0(prettier@3.6.2)
-      '@ionic/swiftlint-config':
-        specifier: ^2.0.0
-        version: 2.0.0
       eslint:
         specifier: ^8.57.0
         version: 8.57.1
@@ -47,13 +44,13 @@ importers:
 
 packages:
 
-  '@capacitor/android@7.4.0':
-    resolution: {integrity: sha512-HVCQsnUobviGt/MR5qCfXsfkSyZ5gjJVW6Jbn0CI5NHhsvUkBtazGjaMjdt5JueIz1pfKXpiuZc/njfRHwjx6Q==}
+  '@capacitor/android@8.5.0':
+    resolution: {integrity: sha512-Rb3prJeQiTp0pQhSSOReJuG9VgibOGMG4ECs+UhMwr6TCCHZ3NCZO811bDA0HxD0xrT/gCrJAsY5yfEATu84JQ==}
     peerDependencies:
-      '@capacitor/core': ^7.4.0
+      '@capacitor/core': ^8.5.0
 
-  '@capacitor/core@7.4.0':
-    resolution: {integrity: sha512-P6NnjoHyobZgTjynlZSn27d0SUj6j38inlNxFnKZr9qwU7/r6+0Sg2nWkGkIH/pMmXHsvGD8zVe6KUq1UncIjA==}
+  '@capacitor/core@8.5.0':
+    resolution: {integrity: sha512-Ca4krtqH1hothjtBIwf2J2TW7IhYq1ujp8QeItTiJohNsqij8ja2DYYH3DU0l8RmxCWaBAFTGA2TgOgOMCSNsQ==}
 
   '@capacitor/docgen@0.3.0':
     resolution: {integrity: sha512-WPggobo5Ql70F+2xOIUwNSApJXaL9F/9+Al6B+sNuSAmcg484OAksyUPKgiynF4BVlxeY5a0sDkgdVkmmA3ElQ==}
@@ -115,9 +112,6 @@ packages:
     resolution: {integrity: sha512-0DqL6CggVdgeJAWOLPUT73rF1VD5p0tVlCpC5GXz5vTIUBxNwsJ5085Q7wXjKiE5Odx3aOHGTcuRWCawFsLFag==}
     peerDependencies:
       prettier: ^2.4.0 || ^3.0.0
-
-  '@ionic/swiftlint-config@2.0.0':
-    resolution: {integrity: sha512-TXy76ALSKhUZzBziHz7aoEtSQwHofBIDRNzM9x4sndtC7fefbZsBw3UgGwXFTOc7hoj72EAGyqZNUhj9LlhaNQ==}
 
   '@isaacs/balanced-match@4.0.1':
     resolution: {integrity: sha512-yzMTt9lEb8Gv7zRioUilSglI0c0smZ9k5D65677DLWLtWJaXIS3CqcGyUFByYKlnUj6TkjLVs54fBl6+TiGQDQ==}
@@ -1342,11 +1336,11 @@ packages:
 
 snapshots:
 
-  '@capacitor/android@7.4.0(@capacitor/core@7.4.0)':
+  '@capacitor/android@8.5.0(@capacitor/core@8.5.0)':
     dependencies:
-      '@capacitor/core': 7.4.0
+      '@capacitor/core': 8.5.0
 
-  '@capacitor/core@7.4.0':
+  '@capacitor/core@8.5.0':
     dependencies:
       tslib: 2.8.1
 
@@ -1426,8 +1420,6 @@ snapshots:
   '@ionic/prettier-config@4.0.0(prettier@3.6.2)':
     dependencies:
       prettier: 3.6.2
-
-  '@ionic/swiftlint-config@2.0.0': {}
 
   '@isaacs/balanced-match@4.0.1': {}
 

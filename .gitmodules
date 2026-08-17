@@ -1,0 +1,8 @@
+[submodule "submodules/PipePipeExtractor"]
+	path = submodules/PipePipeExtractor
+	url = https://github.com/InfinityLoop1308/PipePipeExtractor.git
+	branch = main
+[submodule "submodules/NewPipeExtractor"]
+	path = submodules/NewPipeExtractor
+	url = https://github.com/TeamNewPipe/NewPipeExtractor.git
+	branch = dev

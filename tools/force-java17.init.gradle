@@ -1,0 +1,32 @@
+/*
+ * PipePipeExtractor pins `JavaLanguageVersion.of(25)`, and JitPack builds it on
+ * openjdk25. That yields class-file major 69, which AGP 8 / D8 will not dex —
+ * and because a Capacitor plugin's Android module is compiled by the *consuming
+ * app's* AGP, shipping 69 would force every downstream app onto AGP 9.
+ *
+ * Overriding the toolchain to 17 costs nothing: the source uses no Java 21+
+ * syntax or APIs (verified — no records, sealed types, pattern-matching switch,
+ * or SequencedCollection use), and all 559 classes compile clean to major 61.
+ *
+ * Applied via `-I` so the submodule stays a pristine upstream checkout.
+ *
+ * This is applied to BOTH extractor builds. NewPipeExtractor asks for a JDK 11
+ * toolchain, and while its bytecode is already Android-safe, pinning both to the
+ * same installed JDK means contributors do not need a second JDK just to build
+ * one submodule. 11 -> 17 raises its class files to major 61, still under the
+ * AGP 8 ceiling.
+ */
+gradle.projectsEvaluated {
+    rootProject.allprojects { p ->
+        p.plugins.withId('java') {
+            p.java {
+                toolchain {
+                    languageVersion = JavaLanguageVersion.of(17)
+                }
+            }
+        }
+        p.tasks.withType(JavaCompile).configureEach {
+            options.release = 17
+        }
+    }
+}

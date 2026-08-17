@@ -3,31 +3,67 @@ ext {
     androidxAppCompatVersion = project.hasProperty('androidxAppCompatVersion') ? rootProject.ext.androidxAppCompatVersion : '1.7.0'
     androidxJunitVersion = project.hasProperty('androidxJunitVersion') ? rootProject.ext.androidxJunitVersion : '1.2.1'
     androidxEspressoCoreVersion = project.hasProperty('androidxEspressoCoreVersion') ? rootProject.ext.androidxEspressoCoreVersion : '3.6.1'
+
+    // Kept in sync with the extractor submodules. See CLAUDE.md "Gotchas".
+    jsoupVersion = '1.22.2'
+    protobufVersion = '4.35.1'
+    wireVersion = '6.4.1'
+    rhinoVersion = '1.8.1'          // 1.9.0 requires minSdk 26 — do not bump
+    okhttpVersion = '5.4.0'         // must match PipePipeExtractor — it leaks okhttp3.Call
+    media3Version = '1.9.0'
+    composeBomVersion = '2026.06.01'
 }
 
 buildscript {
+    /*
+     * Declared here, not in the top-level `ext` block: Gradle evaluates
+     * buildscript{} before the project's ext, so a version defined up there is
+     * not visible to these classpath dependencies.
+     *
+     * Capacitor 8's baseline. Consuming apps already require this, so the stdlib
+     * we pull in is one they almost certainly ship anyway.
+     */
+    ext.kotlinVersion = project.hasProperty('kotlinVersion')
+        ? project.property('kotlinVersion')
+        : '2.2.20'
+
     repositories {
         google()
         mavenCentral()
         maven { url 'https://jitpack.io' }
     }
     dependencies {
-        //noinspection AndroidGradlePluginVersion
-        classpath 'com.android.tools.build:gradle:8.7.2'
+        // Capacitor 8 baseline. Do NOT raise this to AGP 9 to accommodate
+        // PipePipeExtractor's JDK 25 toolchain — see CLAUDE.md, Gotcha 1.
+        classpath 'com.android.tools.build:gradle:8.13.0'
+        /*
+         * Kotlin is here for one reason: the BotGuard PO token minter is ported
+         * from PipePipeClient, where the attestation bootstrap and minter are
+         * Kotlin. That code scrapes YouTube's home HTML and needs re-syncing
+         * whenever YouTube shifts — keeping it in its original language makes an
+         * upstream fix a diff rather than a re-translation. See CLAUDE.md.
+         */
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+        // Compose compiler moved into Kotlin itself from 2.0, so it tracks
+        // kotlinVersion rather than having a version of its own.
+        classpath "org.jetbrains.kotlin:compose-compiler-gradle-plugin:$kotlinVersion"
     }
 }
 
 apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
 android {
-    namespace "ink.harsh.plugins.npe"
-    compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 35
+    namespace "ink.harsh.plugins.pipe"
+    compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 36
     defaultConfig {
-        minSdkVersion project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 23
-        targetSdkVersion project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 35
+        minSdkVersion project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 24
+        targetSdkVersion project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 36
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles 'proguard-rules.pro'
     }
     buildTypes {
         release {
@@ -35,31 +71,140 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
-    lintOptions {
+    lint {
         abortOnError false
     }
     compileOptions {
+        // Capacitor 8 compiles capacitor-android at Java 21, so the whole build
+        // needs a JDK 21+. Our own source level must match or the module cannot
+        // sit in the same build. Note this is independent of the extractor jars,
+        // which stay at Java 17 bytecode — a 21 build consumes 17 classes fine.
         sourceCompatibility JavaVersion.VERSION_21
         targetCompatibility JavaVersion.VERSION_21
+        // The extractors use java.time and other desugarable APIs below API 26.
+        coreLibraryDesugaringEnabled true
+    }
+    kotlinOptions {
+        jvmTarget = '21'
+    }
+    buildFeatures {
+        compose true
+    }
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+    packaging {
+        resources {
+            excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*', 'META-INF/*.kotlin_module']
+        }
     }
 }
 
 repositories {
     google()
     mavenCentral()
+    maven { url 'https://jitpack.io' }
 }
 
-
 dependencies {
+    /*
+     * Both extraction engines, built from the pinned submodules by
+     * `npm run extractors:build`:
+     *
+     *   pipepipe-extractor.jar        primary, org.schabi.newpipe.extractor.*
+     *   pipepipe-timeago-parser.jar   its sibling module
+     *   newpipe-extractor-shaded.jar  fallback, relocated to
+     *                                 ink.harsh.pipe.shaded.org.schabi.newpipe.*
+     *
+     * They cannot come from Maven: the two forks share a namespace, so the
+     * fallback only exists because one of them is relocated at build time.
+     */
     implementation fileTree(dir: 'libs', include: ['*.jar'])
+
     implementation project(':capacitor-android')
     //noinspection GradleDependency
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    // Required by the ported BotGuard WebView runtime.
+    implementation 'androidx.webkit:webkit:1.12.1'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.5'
+
+    // --- Shared by both engines (identical version in both forks) ---
+    implementation "org.jsoup:jsoup:$jsoupVersion"
+
+    // --- PipePipeExtractor runtime deps (unrelocated) ---
+    // nanojson is pinned to PipePipe's commit; NewPipe's differing pin is
+    // bundled and relocated inside the shaded jar instead.
+    implementation 'com.github.TeamNewPipe:nanojson:1d9e1aea9049fc9f85e68b43ba39fe7be1c1f751'
+    implementation "com.google.protobuf:protobuf-java:$protobufVersion"
+    implementation "com.squareup.wire:wire-runtime:$wireVersion"
+    implementation 'org.java-websocket:Java-WebSocket:1.6.0'
+    implementation 'org.nibor.autolink:autolink:0.12.0'
+    implementation 'org.brotli:dec:0.1.2'
+    implementation 'org.apache.commons:commons-lang3:3.20.0'
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.85'
+    compileOnly 'com.github.spotbugs:spotbugs-annotations:4.10.2'
+
+    // --- Relocated NewPipeExtractor's un-bundled deps ---
+    // Its protobuf and nanojson are bundled inside the shaded jar; rhino and
+    // jsr305 do not collide, so they are supplied normally.
+    implementation "org.mozilla:rhino:$rhinoVersion"
+    implementation "org.mozilla:rhino-engine:$rhinoVersion"
+    implementation 'com.google.code.findbugs:jsr305:3.0.2'
+
+    /*
+     * okhttp is NOT optional and NOT merely our choice: PipePipeExtractor's
+     * Downloader API exposes it directly —
+     *   public CancellableCall(okhttp3.Call)
+     * so any Downloader we write for that engine must hand back okhttp-backed
+     * calls. Pinned to the version the extractor is compiled against.
+     *
+     * NewPipeExtractor has no such coupling (its Downloader declares only
+     * `execute`), so the relocated engine is unaffected by this version.
+     */
+    implementation "com.squareup.okhttp3:okhttp:$okhttpVersion"
+
+    /*
+     * Media3 is OPTIONAL. Apps that use it get a zero-copy MediaSource for SABR;
+     * apps that do not still work through the loopback HTTP adapter. Keep this
+     * compileOnly and guard every use with a runtime class check, or the plugin
+     * stops being drop-in for web-only consumers.
+     */
+    compileOnly "androidx.media3:media3-exoplayer:$media3Version"
+    compileOnly "androidx.media3:media3-exoplayer-dash:$media3Version"
+    compileOnly "androidx.media3:media3-datasource:$media3Version"
+
+    /*
+     * The player module is optional on the same terms as Media3: an app that
+     * only extracts should not ship Compose. Both are compileOnly, so a
+     * consuming app that wants playback puts Compose and Media3 on its own
+     * classpath — the same signal getEngineStatus already reports.
+     *
+     * Deliberately NOT media3-ui: its PlayerView bundles a controller we would
+     * have to disable wholesale, and every control in the player is custom.
+     */
+    compileOnly platform("androidx.compose:compose-bom:$composeBomVersion")
+    compileOnly 'androidx.compose.ui:ui'
+    compileOnly 'androidx.compose.foundation:foundation'
+    compileOnly 'androidx.activity:activity-compose:1.12.4'
+    compileOnly 'androidx.dynamicanimation:dynamicanimation:1.1.0'
+
+    androidTestImplementation platform("androidx.compose:compose-bom:$composeBomVersion")
+    androidTestImplementation 'androidx.compose.ui:ui'
+    androidTestImplementation 'androidx.compose.foundation:foundation'
+    androidTestImplementation 'androidx.activity:activity-compose:1.12.4'
+    androidTestImplementation 'androidx.dynamicanimation:dynamicanimation:1.1.0'
+
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
 
-    // NewPipeExtractor for YouTube stream extraction
-    implementation "com.github.teamnewpipe:NewPipeExtractor:0.24.6"
-    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    /*
+     * Media3 on the test classpath only. The library keeps it compileOnly so
+     * web-only consumers are unaffected, but the adapter is worthless unless
+     * something actually loads it, so the instrumented tests supply it.
+     */
+    androidTestImplementation "androidx.media3:media3-exoplayer:$media3Version"
+    androidTestImplementation "androidx.media3:media3-exoplayer-dash:$media3Version"
+    androidTestImplementation "androidx.media3:media3-datasource:$media3Version"
+    androidTestImplementation "androidx.media3:media3-common:$media3Version"
 }

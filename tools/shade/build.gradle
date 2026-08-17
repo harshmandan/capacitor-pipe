@@ -1,0 +1,74 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '8.3.6'
+}
+
+/*
+ * Input: the extractor jar produced from the NewPipeExtractor submodule.
+ * Output: android/libs/newpipe-extractor-shaded.jar
+ */
+def newPipeJar = providers.gradleProperty('newPipeJar').get()
+def outputDir = providers.gradleProperty('outputDir').get()
+
+// NewPipeExtractor targets a Java 11 toolchain, so its own bytecode is already
+// Android-safe. We only need to match it here so shadow does not upgrade it.
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+dependencies {
+    // The extractor itself, built from the pinned submodule.
+    implementation files(newPipeJar)
+
+    /*
+     * Bundled AND relocated: these genuinely collide with PipePipe.
+     *   - protobuf: NewPipe uses protobuf-javalite, PipePipe uses full
+     *     protobuf-java. Both publish com.google.protobuf.* and are not
+     *     co-installable.
+     *   - nanojson: the two forks pin different commits of the same artifact.
+     */
+    implementation 'com.google.protobuf:protobuf-javalite:4.35.1'
+    implementation 'com.github.TeamNewPipe:nanojson:e9d656ddb49a412a5a0a5d5ef20ca7ef09549996'
+
+    /*
+     * Deliberately NOT bundled: no collision, so the Android module supplies
+     * these once and both engines share them. jsoup is pinned to the same
+     * 1.22.2 by both forks; rhino and jsr305 are NewPipe-only.
+     */
+    compileOnly 'org.jsoup:jsoup:1.22.2'
+    compileOnly 'org.mozilla:rhino:1.8.1'
+    compileOnly 'org.mozilla:rhino-engine:1.8.1'
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+}
+
+tasks.named('shadowJar') {
+    archiveBaseName = 'newpipe-extractor-shaded'
+    archiveClassifier = ''
+    archiveVersion = ''
+    destinationDirectory = file(outputDir)
+
+    // Every relocation lands under one predictable prefix. The Java engine
+    // wrapper imports these names directly; keep them in sync with
+    // NewPipeEngine.java if you ever change the prefix.
+    relocate 'org.schabi.newpipe', 'ink.harsh.pipe.shaded.org.schabi.newpipe'
+    relocate 'com.google.protobuf', 'ink.harsh.pipe.shaded.com.google.protobuf'
+    relocate 'com.grack.nanojson', 'ink.harsh.pipe.shaded.com.grack.nanojson'
+
+    // Signatures and module metadata are meaningless after relocation and
+    // break dexing if left behind.
+    exclude 'META-INF/*.SF'
+    exclude 'META-INF/*.DSA'
+    exclude 'META-INF/*.RSA'
+    exclude 'META-INF/versions/**'
+    exclude 'module-info.class'
+    exclude '**/*.proto'
+
+    mergeServiceFiles()
+}
+
+// `build` should mean "produce the shaded jar", nothing else.
+tasks.named('build') {
+    dependsOn tasks.named('shadowJar')
+}

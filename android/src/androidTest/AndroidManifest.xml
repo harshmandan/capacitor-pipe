@@ -1,0 +1,14 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        The SABR loopback server speaks plain HTTP on 127.0.0.1, and Android
+        blocks cleartext by default from API 28. Consuming apps allow it through
+        a network security config (see res/xml/pipe_network_security_config.xml);
+        the test APK just opts in wholesale.
+    -->
+    <application
+        android:usesCleartextTraffic="true"
+        tools:targetApi="28" />
+
+</manifest>

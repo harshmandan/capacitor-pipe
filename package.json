@@ -1,53 +1,66 @@
 {
-  "name": "capacitor-npe",
-  "version": "0.24.6",
-  "description": "NPE Wrapper for capacitor. Allows you to call the Java APIs asynchronously as a plugin. Only works on Android. Fully typed.",
+  "name": "capacitor-pipe",
+  "version": "1.0.0",
+  "description": "YouTube extraction for Capacitor, powered by PipePipeExtractor with NewPipeExtractor as a fallback. Includes full SABR support playable from Media3/ExoPlayer or any web player. Android only. Fully typed.",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
   "unpkg": "dist/plugin.js",
   "files": [
     "android/src/main/",
+    "android/libs/",
     "android/build.gradle",
+    "android/proguard-rules.pro",
     "dist/",
-    "Package.swift"
+    "LICENSE"
   ],
   "author": "Harsh Mandan",
   "url": "https://harsh.ink",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/harshmandan/capacitor-npe.git"
+    "url": "git+https://github.com/harshmandan/capacitor-pipe.git"
   },
   "bugs": {
-    "url": "https://github.com/harshmandan/capacitor-npe/issues"
+    "url": "https://github.com/harshmandan/capacitor-pipe/issues"
   },
   "keywords": [
     "capacitor",
     "plugin",
-    "native"
+    "android",
+    "youtube",
+    "pipepipe",
+    "newpipe",
+    "extractor",
+    "sabr",
+    "dash",
+    "media3",
+    "exoplayer"
   ],
   "scripts": {
     "verify": "npm run verify:android && npm run verify:web",
     "verify:android": "cd android && ./gradlew clean build test && cd ..",
     "verify:web": "npm run build",
-    "lint": "npm run eslint && npm run prettier -- --check && npm run swiftlint -- lint",
-    "fmt": "npm run eslint -- --fix && npm run prettier -- --write && npm run swiftlint -- --fix --format",
+    "lint": "npm run eslint && npm run prettier -- --check",
+    "fmt": "npm run eslint -- --fix && npm run prettier -- --write",
     "eslint": "eslint . --ext ts",
     "prettier": "prettier \"**/*.{css,html,ts,js,java}\" --plugin=prettier-plugin-java",
-    "docgen": "docgen --api NPEPlugin --output-readme README.md --output-json dist/docs.json",
+    "docgen": "docgen --api PipePlugin --output-readme README.md --output-json dist/docs.json",
     "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.mjs",
     "clean": "rimraf ./dist",
     "watch": "tsc --watch",
+    "extractors:init": "git submodule update --init --recursive",
+    "extractors:build": "./scripts/build-extractors.sh",
+    "extractors:update": "./scripts/update-extractors.sh",
+    "extractors:check": "./scripts/check-divergences.sh",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
-    "@capacitor/android": "^7.0.0",
-    "@capacitor/core": "^7.0.0",
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
     "@capacitor/docgen": "^0.3.0",
     "@ionic/eslint-config": "^0.4.0",
     "@ionic/prettier-config": "^4.0.0",
-    "@ionic/swiftlint-config": "^2.0.0",
     "eslint": "^8.57.0",
     "prettier": "^3.4.2",
     "prettier-plugin-java": "^2.6.6",
@@ -56,7 +69,7 @@
     "typescript": "~4.1.5"
   },
   "peerDependencies": {
-    "@capacitor/core": ">=7.0.0"
+    "@capacitor/core": ">=8.0.0"
   },
   "prettier": "@ionic/prettier-config",
   "eslintConfig": {

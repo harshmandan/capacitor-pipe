@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <title>capacitor-pipe — player composite proof</title>
+    <meta
+      name="viewport"
+      content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        font: 15px/1.5 system-ui, sans-serif;
+        background: #101014;
+        color: #e8e8ea;
+        padding: 16px;
+      }
+      h1 { font-size: 18px; margin: 0 0 4px; }
+      p.sub { margin: 0 0 16px; color: #8a8a94; font-size: 13px; }
+
+      /*
+       * The reserved space. Its measured rect is what gets handed to dock() —
+       * the host declares where the video goes, the player owns how it gets
+       * there.
+       */
+      #stage {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        background: #1c1c22;
+        border: 1px dashed #3a3a44;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        color: #55555f;
+        font-size: 13px;
+      }
+
+      /*
+       * Deliberately animated: if the native surface really is composited over
+       * the WebView, this keeps repainting underneath while video plays. A
+       * static page would not prove that.
+       */
+      .ticker {
+        margin-top: 14px;
+        height: 6px;
+        border-radius: 3px;
+        background: linear-gradient(90deg, #6d5efc, #22d3ee, #6d5efc);
+        background-size: 200% 100%;
+        animation: slide 2s linear infinite;
+      }
+      @keyframes slide { to { background-position: -200% 0; } }
+
+      .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+      button {
+        flex: 1 1 auto;
+        padding: 10px 12px;
+        border: 0;
+        border-radius: 8px;
+        background: #2a2a34;
+        color: #e8e8ea;
+        font: inherit;
+      }
+      button:active { background: #3a3a48; }
+      pre {
+        margin-top: 14px;
+        padding: 10px;
+        background: #16161c;
+        border-radius: 8px;
+        font-size: 12px;
+        white-space: pre-wrap;
+        color: #9aa0a6;
+        min-height: 3em;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Player composite proof</h1>
+    <p class="sub">Phase 1 — native Compose + Media3 over the WebView. No gestures yet.</p>
+
+    <div id="stage">host-reserved rect</div>
+    <div class="ticker"></div>
+
+    <div class="row">
+      <button id="status">Status</button>
+      <button id="dock">Dock</button>
+      <button id="undock">Undock</button>
+    </div>
+    <div class="row">
+      <button id="load">Load</button>
+      <button id="play">Play</button>
+      <button id="pause">Pause</button>
+      <button id="release">Release</button>
+    </div>
+
+    <pre id="log">ready</pre>
+
+    <script type="module" src="./js/player.js"></script>
+  </body>
+</html>

@@ -1,4 +1,4 @@
-import { NPE } from 'capacitor-npe';
+import { Pipe } from 'capacitor-pipe';
 
 window.extractYouTubeStreams = async () => {
     const videoUrl = document.getElementById("videoUrlInput").value || "https://www.youtube.com/watch?v=kJQP7kiw5Fk";
@@ -7,12 +7,17 @@ window.extractYouTubeStreams = async () => {
     resultDiv.innerHTML = "Extracting stream info...";
     
     try {
-        const result = await NPE.extractStreamInfo({ videoUrl });
+        const result = await Pipe.extractStreamInfo({ videoUrl });
         
         if (result.success) {
             const streamInfo = result.streamInfo;
+            const attempts = (result.attempts || [])
+                .map((a) => `${a.engine}: ${a.ok ? 'ok' : 'failed — ' + a.error} (${a.durationMs}ms)`)
+                .join('<br>');
             let html = `
                 <h3>${streamInfo.title}</h3>
+                <p><strong>Engine:</strong> ${result.engine}${streamInfo.requiresSabr ? ' — requires SABR' : ''}</p>
+                <p style="font-size:12px;color:#666">${attempts}</p>
                 <p><strong>Uploader:</strong> ${streamInfo.uploader}</p>
                 <p><strong>Duration:</strong> ${streamInfo.duration} seconds</p>
                 <p><strong>Views:</strong> ${streamInfo.viewCount}</p>

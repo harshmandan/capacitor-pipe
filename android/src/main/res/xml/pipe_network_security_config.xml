@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Permits cleartext HTTP to the loopback interface only.
+
+    SABR has no fetchable URL, so the plugin serves a DASH manifest and its
+    segments from a local HTTP server on 127.0.0.1. Android blocks cleartext by
+    default from API 28, which makes that server unreachable and produces a
+    confusing `UnknownServiceException: CLEARTEXT communication to 127.0.0.1 not
+    permitted by network security policy`.
+
+    Nothing here loosens policy for any real host: only loopback, which never
+    leaves the device.
+
+    Most Capacitor apps already allow localhost cleartext, since Capacitor
+    itself serves the web assets over a local scheme. If yours does not, point
+    your application at this file:
+
+        <application android:networkSecurityConfig="@xml/pipe_network_security_config">
+
+    or merge the domain-config below into your own config.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>
