@@ -10,6 +10,8 @@ import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.exceptions.ExtractionException
 import org.schabi.newpipe.extractor.localization.ContentCountry
 import org.schabi.newpipe.extractor.localization.Localization
+import ink.harsh.plugins.pipe.youtube.PipeLocalPlayerDecoder
+import org.schabi.newpipe.extractor.services.youtube.YoutubeApiDecoder
 import org.schabi.newpipe.extractor.services.youtube.YoutubePoTokenResult
 import org.schabi.newpipe.extractor.services.youtube.sabr.YoutubeSabrInfo
 import org.schabi.newpipe.extractor.sponsorblock.SponsorBlockApiSettings
@@ -115,6 +117,23 @@ class PipePipeEngine : ExtractionEngine {
 
         if (!initialized) {
             NewPipe.init(PipePipeDownloader(), localization, country)
+
+            /*
+             * Decipher on device instead of at api.pipepipe.dev.
+             *
+             * Registered here rather than lazily because the very first thing a
+             * cold extraction needs is the signature timestamp, and without a
+             * local decoder that call reaches PipePipe's infrastructure BEFORE
+             * YouTube (CLAUDE.md, Gotcha 5). Registering after the first
+             * extraction would leak exactly the request we are trying to avoid.
+             *
+             * Not a hard switch: PipePipe still falls back to its API if the
+             * local decoder throws. The fallback is one-way and permanent
+             * though, which is why PipeLocalPlayerDecoder swallows transient
+             * failures rather than letting them escape.
+             */
+            YoutubeApiDecoder.setLocalDecoder(PipeLocalPlayerDecoder())
+
             initialized = true
             return
         }

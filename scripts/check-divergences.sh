@@ -210,6 +210,31 @@ assert_grep 12 yes "$ROOT/submodules/NewPipeExtractor/gradle/libs.versions.toml"
 assert_grep 12 yes "$ROOT/submodules/NewPipeExtractor/gradle/libs.versions.toml" \
     'rhino = "1\.8' "NewPipe still pins rhino 1.8.x (1.9.0 needs minSdk 26)"
 
+head2 "13. Local signature deciphering"
+# The decoder hook we hang PipeLocalPlayerDecoder off. If it disappears or is
+# renamed, the local decoder silently stops being installed and every extraction
+# goes back to api.pipepipe.dev -- no error, no failed build.
+assert_grep 13 yes "$PP/services/youtube/YoutubeApiDecoder.java" \
+    'static void setLocalDecoder' "PipePipe still exposes setLocalDecoder"
+# One escaped exception unregisters us for the life of the process. If this
+# behaviour changes, PipeLocalPlayerDecoder's internal retry is either
+# unnecessary or insufficient.
+assert_grep 13 yes "$PP/services/youtube/YoutubeApiDecoder.java" \
+    'disableLocalDecoder' "PipePipe still disables a failing local decoder permanently"
+# decodeBatch takes a PLAYER id, not a video id -- the whole reason
+# PipeLocalPlayerDecoder has to borrow a video id from getPlayerData.
+assert_grep 13 yes "$PP/services/youtube/YoutubeJavaScriptDecoder.java" \
+    'decodeBatch' "PipePipe's decoder interface still exposes decodeBatch"
+assert_grep 13 yes "$PP/services/youtube/YoutubeJavaScriptDecoder.java" \
+    'PlayerData getPlayerData' "PipePipe's decoder interface still exposes getPlayerData"
+# The three NewPipe entry points the local decoder is built on.
+assert_grep 13 yes "$NP/services/youtube/YoutubeJavaScriptPlayerManager.java" \
+    'getSignatureTimestamp' "NewPipe still exposes getSignatureTimestamp"
+assert_grep 13 yes "$NP/services/youtube/YoutubeJavaScriptPlayerManager.java" \
+    'deobfuscateSignature' "NewPipe still exposes deobfuscateSignature"
+assert_grep 13 yes "$NP/services/youtube/YoutubeJavaScriptPlayerManager.java" \
+    'getUrlWithThrottlingParameterDeobfuscated' "NewPipe still deobfuscates n only via a URL"
+
 printf '\n'
 if [ "$changed" -eq 0 ]; then
     printf '\033[32mAll %s divergence checks hold.\033[0m\n' "$checks"

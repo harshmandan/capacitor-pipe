@@ -99,11 +99,11 @@ on. Add to them whenever the wrapper starts calling something new.
 [DIVERGENCES.md](DIVERGENCES.md) records every point where our code forks to
 handle the two engines differently, with file and symbol anchors and what to
 re-check per dependency. `scripts/check-divergences.sh` asserts them against both
-submodules' source (39 checks), and `update-extractors.sh` runs it before
+submodules' source (46 checks), and `update-extractors.sh` runs it before
 rebuilding, rolling the pins back if anything changed.
 
 ```bash
-npm run extractors:check     # assert the recorded divergences still hold
+bun run extractors:check     # assert the recorded divergences still hold
 ```
 
 **Whenever you write code that treats the two engines differently, add it to
@@ -221,16 +221,28 @@ minSdk 24, compileSdk 36, targetSdk 36, AGP 8.13.0, Gradle 8.14.3, Kotlin
 2.2.20. Capacitor **8.5 is iOS-only** (UIScene lifecycle) — no Android impact
 here, and this plugin has no iOS side at all.
 
-### 5. PipePipe's YouTube path depends on a remote service
+### 5. PipePipe's YouTube path depends on a remote service — unless we intervene
 
 PipePipe replaced NewPipe's local Rhino execution with
 `YoutubeApiDecoder.decodeSignature(...)` against a **PipePipe-hosted** decoder.
-Signature and `n`-parameter deciphering therefore require reaching their
-infrastructure. NewPipe still deciphers locally in Rhino.
+Left alone, the *first outbound request of a cold extraction* goes to
+`api.pipepipe.dev/decoder/latest-player` — before YouTube — because the signature
+timestamp is needed to build the InnerTube payload. Cached 24h thereafter.
 
-This is the main reason the fallback earns its keep: the two engines fail for
-genuinely different reasons. It is also a privacy consideration worth surfacing
-to users.
+`PipeLocalPlayerDecoder` closes that hole: it implements PipePipe's
+`YoutubeJavaScriptDecoder` on top of the relocated NewPipe fork, so deciphering
+happens on device and the API is never called. See DIVERGENCES.md §13 — it is
+the one file that imports both namespaces, and the borrowed-video-ID and
+synthetic-`playerId` caveats there are load bearing.
+
+The remote path remains as PipePipe's own fallback, so this is a preference, not
+a guarantee. **If the local decoder throws even once, PipePipe unregisters it
+permanently** and the process silently reverts to the API — no log, no failed
+build. `LocalPlayerDecoderTest.extractionNeverContactsPipePipesApi` asserts on
+the URLs actually requested, which is the only way to tell the two apart.
+
+The two engines still fail for genuinely different reasons, which is why the
+fallback earns its keep.
 
 ### 6. SABR is a session, not a URL
 
@@ -701,7 +713,7 @@ Sessions hold a segment cache and a WebView-minted token. They must be closed.
 
 - Android-only. The web implementation is a stub that reports unavailability —
   extraction cannot run in a browser (CORS, and SABR needs a WebView for BotGuard).
-- `src/definitions.ts` is the source of truth for the API; run `npm run docgen`
+- `src/definitions.ts` is the source of truth for the API; run `bun run docgen`
   after changing it, which rewrites the README API section.
 - Prefer surfacing structured failure (`attempts`, `errorType`) over throwing.
   Callers need to distinguish "age-restricted" from "both engines are broken".

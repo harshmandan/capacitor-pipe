@@ -399,3 +399,50 @@ A new dependency there is invisible until something throws
 `NoClassDefFoundError` at runtime, because our `android/build.gradle` declares
 these by hand. `scripts/update-extractors.sh` prints build-file diffs for exactly
 this reason.
+
+---
+
+## 13. Local signature deciphering — one fork wearing the other's interface
+
+The only place that deliberately imports **both** namespaces in one file:
+`android/src/main/kotlin/ink/harsh/plugins/pipe/youtube/PipeLocalPlayerDecoder.kt`.
+
+| Concern | PipePipe | NewPipe |
+|---|---|---|
+| Where deciphering runs | remote — `https://api.pipepipe.dev/decoder/decode` | local, in Rhino |
+| Pluggable decoder | yes — `YoutubeApiDecoder.setLocalDecoder(YoutubeJavaScriptDecoder)` | no such hook |
+| Identifier at decode time | **player** ID (`decodeBatch(playerId, ...)`) | **video** ID (`deobfuscateSignature(videoId, sig)`) |
+| Bare `n` deobfuscation | `decodeBatch(..., nParams)` takes raw values | only `getUrlWithThrottlingParameterDeobfuscated(videoId, url)` — a whole URL |
+| Failure policy | `disableLocalDecoder` unregisters **permanently**, on any exception | n/a |
+
+We implement PipePipe's `YoutubeJavaScriptDecoder` on top of the **relocated**
+NewPipe fork, so the primary engine deciphers on device and never calls
+PipePipe's infrastructure. Three consequences, each a place this can break
+quietly:
+
+1. **The borrowed video ID.** PipePipe's `decodeBatch` receives no video ID, so
+   `getPlayerData` stashes one and `decodeBatch` reuses it. Tolerable only
+   because NewPipe uses the ID solely to locate the *global* player script;
+   concurrent extractions may overwrite each other and still decode correctly.
+   A borrowed ID that is deleted or geo-blocked is the real failure, hence the
+   retry.
+2. **`playerId` is synthetic** (`"localjs"`). Safe only while PipePipe keeps it
+   as a decode cache key. **If it ever reaches an InnerTube payload this breaks
+   silently** — YouTube would see a player ID that does not exist.
+   `signatureTimestamp` does reach the payload and comes from the same NewPipe
+   player as the signatures, so those two cannot disagree.
+3. **One escaped exception disables us forever.** `PipeLocalPlayerDecoder`
+   therefore retries internally; anything that escapes reverts the process to
+   the remote API with no log and no failed build.
+
+**On upgrade (PipePipe):** re-check that `YoutubeJavaScriptDecoder` still has
+this shape, that `setLocalDecoder`/`disableLocalDecoder` semantics are unchanged,
+and above all that `playerId` still never leaves the decoder.
+
+**On upgrade (NewPipe):** re-check `YoutubeJavaScriptPlayerManager` still exposes
+`getSignatureTimestamp`, `deobfuscateSignature` and
+`getUrlWithThrottlingParameterDeobfuscated`.
+
+- `LocalPlayerDecoderTest.extractionNeverContactsPipePipesApi` — asserts on the
+  URLs actually requested, which is the only assertion that distinguishes local
+  deciphering from remote.
