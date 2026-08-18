@@ -30,7 +30,31 @@
 # JavaScript in Rhino, so the interpreter is reached reflectively and cannot be
 # shrunk. PipePipe does this server-side instead (see CLAUDE.md, Gotcha 5) —
 # meaning these rules matter precisely when the primary engine has failed.
--keep class org.mozilla.javascript.** { *; }
+# Narrowed from a blanket `org.mozilla.javascript.**`. Three sub-packages are
+# provably unreachable for how NewPipe drives Rhino, and they were the bulk of
+# both the readable symbols and the size:
+#
+#   optimizer.**  compiled mode only. JavaScript.java calls
+#                 context.setInterpretedMode(true) before every evaluation, so
+#                 Codegen/Bootstrapper/OptRuntime never run.
+#   tools.**      the debugger and shell REPL.
+#   engine.**     the JSR-223 ScriptEngine binding.
+#
+# Everything else stays kept-and-unobfuscated, and that is NOT laziness.
+# Rhino wires its standard objects through LazilyLoadedCtor, whose constructor
+# takes the implementation class name as a STRING and resolves it reflectively.
+# Scanning rhino-1.8.1 for such literals gives the list below — R8 cannot see
+# any of them, and renaming one produces a ClassNotFoundException at runtime in
+# the FALLBACK engine, i.e. only once the primary has already failed:
+#
+#   Context ContextFactory Function ImporterTopLevel Interpreter JavaAdapter
+#   NativeContinuation NativeFunction NativeJavaTopPackage ScriptRuntime
+#   ScriptableObject VMBridge  jdk18.VMBridge  regexp.{NativeRegExp,RegExpImpl}
+#   typedarrays.*  xmlimpl.XMLLibImpl  resources.Messages
+#
+# Keeping the remaining classes wholesale is cheaper than maintaining that list
+# against every Rhino bump, and the sub-packages above are where the size was.
+-keep class !org.mozilla.javascript.optimizer.**,!org.mozilla.javascript.tools.**,!org.mozilla.javascript.engine.**,org.mozilla.javascript.** { *; }
 -keep class org.mozilla.classfile.ClassFileWriter
 -dontwarn org.mozilla.javascript.tools.**
 
