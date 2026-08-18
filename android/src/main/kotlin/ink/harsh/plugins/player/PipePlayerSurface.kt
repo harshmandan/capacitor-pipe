@@ -28,6 +28,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.DisposableEffect
@@ -38,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -46,8 +48,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import android.content.res.Configuration
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -64,23 +64,18 @@ import kotlin.math.roundToInt
 import kotlin.math.sign
 
 /**
- * Draws the video somewhere between its docked rect and fullscreen, and lets a
- * finger move it between the two.
+ * Draws the video at its settled rect — docked, corner or fullscreen — and lets
+ * a finger move it between docked and fullscreen.
  *
- * The whole transform is one interpolation on [PipePlayerMotion]'s
- * progress:
- *
- * ```
- *              p = 0 (docked)        p = 1 (fullscreen)
- *   bounds     host's dock rect      screenH x screenW, centred
- *   rotation   0°                    90°
- * ```
- *
- * The size swaps and the layer rotates, so at p = 1 a landscape-shaped box
- * rotated a quarter turn exactly fills a portrait screen. The Activity never
- * changes orientation — no config change, no recreation, no black frame, and
- * the host WebView underneath is never reflowed mid-drag. YouTube fakes it the
- * same way.
+ * The model is discrete, not interpolated. A drag only TRANSLATES the settled
+ * video with rubber-band resistance; the actual change of state happens on
+ * release, behind [PipePlayerMotion]'s shutter, and is carried by a real
+ * orientation change — steady-state fullscreen is a genuinely landscape
+ * Activity, so there is one coordinate frame rather than two. `progress` is a
+ * drag offset in travel units (0 at the docked rest, 1 at the fullscreen
+ * rest), not a shape parameter; nothing between the two states is ever
+ * rendered. See CLAUDE.md Gotcha 24 for why the earlier continuous rotation
+ * was the wrong model.
  */
 @Composable
 internal fun PipePlayerSurface(
@@ -104,6 +99,14 @@ internal fun PipePlayerSurface(
     /** Host-declared size, corner and margins for the corner player. */
     miniConfig: PipePlayerMiniConfig,
     chromeState: PipePlayerChromeState,
+    /**
+     * Playhead and buffered-ahead, deliberately NOT fields of [chromeState]:
+     * they tick four times a second forever, and as fields every tick
+     * recomposed everything the state touches. As `State` they are read only
+     * where they are drawn.
+     */
+    position: State<Long>,
+    buffered: State<Long>,
     chromeCallbacks: PipePlayerChromeCallbacks,
     bindSurface: (TextureView) -> Unit,
     onImmersiveChanged: (Boolean) -> Unit,
@@ -116,12 +119,6 @@ internal fun PipePlayerSurface(
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val density = LocalDensity.current
-
-        /*
-         * Read the CURRENT window size rather than the values captured when the
-         * overlay attached: those go stale the moment the device rotates.
-         */
-        val configuration = LocalConfiguration.current
 
         /*
          * Measured geometry, never displayMetrics.
@@ -140,18 +137,6 @@ internal fun PipePlayerSurface(
         // Nothing has been laid out yet: drawing against a zero-sized screen
         // would flash the video at the wrong place for a frame.
         if (screenW <= 0f || screenH <= 0f) return@BoxWithConstraints
-
-        /*
-         * If the Activity is ALREADY landscape, do not fake a rotation on top of
-         * the real one — the video would end up a quarter turn out. This happens
-         * when the host is not portrait-locked and the user turns the phone:
-         * Android rotates the Activity, and our transform rotated again.
-         *
-         * The host is documented as needing screenOrientation="portrait", but
-         * being defensive here is cheap and the failure is otherwise baffling.
-         */
-        val activityLandscape =
-            configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
         /*
          * The corner window. A host that has navigated away claims no rect at
@@ -258,11 +243,12 @@ internal fun PipePlayerSurface(
         val base = docked ?: corner
 
         /*
-         * PiP pins both axes rather than animating to them. The system is
+         * PiP pins the mini axis rather than animating it. The system is
          * already animating the window itself, and running our transform at the
          * same time would be two animations fighting over the same pixels.
+         * (The drag axis is pinned inside the deferred readers below, for the
+         * same reason.)
          */
-        val p = if (pip) 1f else motion.progress.value
         val m = if (pip) 0f else motion.miniProgress.value
 
         /*
@@ -303,7 +289,23 @@ internal fun PipePlayerSurface(
          * so filling it is the only correct answer whatever the player was doing
          * a moment ago.
          */
-        val fullscreen = motion.committed || pip
+        /*
+         * GEOMETRY follows the window, not the intent.
+         *
+         * `committed` flips the instant the user lets go, which resized the
+         * player to fullscreen while the window was still portrait — the odd
+         * letterboxed frame that had to be hidden. Keyed to the MEASURED window
+         * instead, the player is only ever the shape its window actually is, so
+         * there is no wrong frame to hide and the video can stay visible while
+         * the system rotates it. The measurement updates exactly when the config
+         * change lands, which is the moment the new shape becomes correct.
+         *
+         * Entering, it stays docked-size until the config lands and is then
+         * already fullscreen; leaving, the reverse. The resize coincides with
+         * the rotation completing instead of preceding it.
+         */
+        val windowIsLandscape = screenW > screenH
+        val fullscreen = pip || windowIsLandscape
 
         val restWidth = if (fullscreen) screenW else start.width()
         val restHeight = if (fullscreen) screenH else start.height()
@@ -311,63 +313,6 @@ internal fun PipePlayerSurface(
             if (fullscreen) geo.screenX + screenW / 2f else start.centerX()
         val restCentreY =
             if (fullscreen) geo.screenY + screenH / 2f else start.centerY()
-
-        /*
-         * `p` is now a DRAG offset in progress units, not a shape parameter:
-         * 0 at rest, growing as the finger pulls away from the settled state.
-         * Expanding pulls up (negative y), collapsing pulls down.
-         */
-        val dragOffset = if (fullscreen) p - 1f else p
-        val travelPx = min(screenW, screenH) * 0.45f
-
-        /*
-         * Resisted, so the video comes to a stop instead of sliding away.
-         *
-         * An unbounded translation let the finger drag the video right off the
-         * screen, which reads as a broken gesture rather than as a control. This
-         * is the standard rubber band: movement tapers as it grows, and the
-         * shift approaches an asymptote around 40% of travel however far the
-         * finger goes. The resistance itself is the signal that you have gone
-         * far enough to commit.
-         */
-        val magnitude = abs(dragOffset).coerceIn(0f, 1f)
-        val resisted = magnitude / (1f + magnitude * 1.5f)
-        val shift = -sign(dragOffset) * resisted * travelPx
-
-        // A touch smaller as it is dragged, so the gesture feels physical. Tiny
-        // on purpose: this is feedback, not a transformation.
-        val pickUp = 1f - 0.06f * resisted
-
-        val width = restWidth * pickUp
-        val height = restHeight * pickUp
-        val centreX = restCentreX
-        val centreY = restCentreY + shift
-
-        /*
-         * Bars follow the COMMITTED state, not a threshold on progress.
-         *
-         * This was `p > 0.5f`, which is the drag itself — so halfway through a
-         * gesture the navigation bar vanished and the status bar changed colour,
-         * announcing a commit that had not happened and could still be
-         * cancelled. Every visible consequence of fullscreen has to hang off the
-         * same latch, or the drag keeps leaking decisions.
-         */
-        val immersive = motion.committed
-        LaunchedEffect(immersive) { onImmersiveChanged(immersive) }
-
-        /*
-         * Orientation waits for the transform to STOP.
-         *
-         * Bars can toggle at the midpoint because hiding them costs nothing
-         * mid-drag; an orientation change cannot, because it reflows the host
-         * page under the finger. `targetValue` rather than the live value, so
-         * this fires once the spring has decided where it is going rather than
-         * chattering as it settles.
-         */
-        val settledFullscreen = motion.committed && !mini && !pip
-        LaunchedEffect(settledFullscreen) { onFullscreenSettled(settledFullscreen) }
-
-        val scope = rememberCoroutineScope()
 
         /*
          * Travel is the drag distance spanning docked to fullscreen.
@@ -380,9 +325,93 @@ internal fun PipePlayerSurface(
          * commit and swipe-to-exit stopped landing.
          *
          * If it ever needs slowing again, change this multiplier AND
-         * COMMIT_VELOCITY in PipePlayerMotion together. They are one setting.
+         * COMMIT_VELOCITY in PipePlayerMotion together. They are one setting —
+         * and ONE value here: the rubber-band shift and the velocity divisor
+         * both read this val, after briefly being two copies of the same
+         * expression that could drift apart.
          */
         val travel = min(screenW, screenH) * 0.45f
+
+        /*
+         * Deferred readers, NOT composition values.
+         *
+         * `progress` moves every frame of a drag and every frame of the release
+         * spring. Read here in composition, each of those frames re-executed
+         * this whole function — rect maths, modifier chains, gesture nodes,
+         * chrome plumbing. These helpers read it instead from whichever scope
+         * calls them: the offset lambda (placement), the graphicsLayer block
+         * (pick-up scale) and the backdrop's draw pass. A drag frame then costs
+         * a placement + a layer update + a redraw, and recomposes nothing.
+         *
+         * The drag offset is 0 at rest, growing as the finger pulls away from
+         * the settled state; expanding pulls up (negative y), collapsing pulls
+         * down. Pinned to 0 in PiP — the system is animating the window itself,
+         * and our transform fighting it would be two animations on one pixel.
+         *
+         * The rubber band: movement tapers as it grows, and the shift
+         * approaches an asymptote around 40% of travel however far the finger
+         * goes. The resistance itself is the signal that you have gone far
+         * enough to commit.
+         */
+        fun currentDragOffset(): Float =
+            if (pip) 0f else motion.progress.value - (if (fullscreen) 1f else 0f)
+
+        fun currentResisted(): Float {
+            val magnitude = abs(currentDragOffset()).coerceIn(0f, 1f)
+            return magnitude / (1f + magnitude * 1.5f)
+        }
+
+        fun currentShift(): Float = -sign(currentDragOffset()) * currentResisted() * travel
+
+        /*
+         * The one structural question the drag answers — "is the player at its
+         * docked rest?" — as derived state, so composition is invalidated only
+         * when the answer CHANGES, not on every frame the finger moves.
+         */
+        val atDockedRest by remember { derivedStateOf { motion.progress.value <= 0.01f } }
+
+        /*
+         * Bars follow the COMMITTED state, not a threshold on progress.
+         *
+         * This was `p > 0.5f`, which is the drag itself — so halfway through a
+         * gesture the navigation bar vanished and the status bar changed colour,
+         * announcing a commit that had not happened and could still be
+         * cancelled. Every visible consequence of fullscreen has to hang off the
+         * same latch, or the drag keeps leaking decisions.
+         */
+        /*
+         * The first emission of each effect below is SKIPPED unless it has
+         * something to change. On attach, `immersive` is false and "settled
+         * fullscreen" is false — but calling the host with those defaults was
+         * not a no-op: setImmersive(false) un-hid bars an edge-to-edge host had
+         * deliberately hidden and re-fitted its decor, and the settled callback
+         * armed the sensor suppression before anything had happened. Window
+         * state belongs to the host until the player actually changes it.
+         */
+        val immersive = motion.committed
+        var immersiveSeen by remember { mutableStateOf<Boolean?>(null) }
+        LaunchedEffect(immersive) {
+            val first = immersiveSeen == null
+            immersiveSeen = immersive
+            if (!first || immersive) onImmersiveChanged(immersive)
+        }
+
+        /*
+         * Orientation waits for the COMMITTED state, decided on release — never
+         * a threshold on the moving drag. Bars can toggle the moment the latch
+         * flips because hiding them costs nothing; the orientation change rides
+         * the same latch because it reflows the host page, which must never
+         * happen under a finger.
+         */
+        val settledFullscreen = motion.committed && !mini && !pip
+        var settledSeen by remember { mutableStateOf<Boolean?>(null) }
+        LaunchedEffect(settledFullscreen) {
+            val first = settledSeen == null
+            settledSeen = settledFullscreen
+            if (!first || settledFullscreen) onFullscreenSettled(settledFullscreen)
+        }
+
+        val scope = rememberCoroutineScope()
 
         /*
          * Which node owns the in-flight drag.
@@ -430,35 +459,53 @@ internal fun PipePlayerSurface(
          * rest there is no pointer-input node here at all, and touches reach the
          * WebView untouched — which is the whole premise of an overlay.
          */
-        val collapseDraggable = !mini && !pip && (screenDragging || p > 0.01f) && !boxDragging
+        /*
+         * `!transitioning` is what stops an impatient finger from wrecking the
+         * switch. The shutter deliberately does not intercept touches, so
+         * without this a touch during the black-out drove `drag`, whose snapTo
+         * cancelled the in-flight commit — dropping the curtain onto a
+         * half-rotated window, with `committed` already latched. While the
+         * choreography runs there is simply nothing to drag.
+         */
+        val collapseDraggable = !mini && !pip && !motion.transitioning &&
+            (screenDragging || !atDockedRest) && !boxDragging
 
         /*
-         * An opaque backdrop between the host's page and the video.
+         * An opaque backdrop between the host's page and the video: permanent
+         * in fullscreen, progressive during a drag-up. Dragging a fullscreen
+         * video down reveals whatever is behind it — a web page still laid out
+         * for portrait, or actively reflowing — so YouTube puts black there,
+         * and so do we. It has nothing to do with covering the switch; that is
+         * the shutter's job, drawn over everything at the end of this
+         * composable.
          *
-         * This is what makes the whole approach work. Dragging a fullscreen
-         * video down reveals whatever is behind it — and behind it is a web page
-         * that is either still portrait-laid-out or actively reflowing. YouTube
-         * puts black there, so the reflow simply never appears on screen; the
-         * config change stops being something to hide and becomes something to
-         * use.
-         *
-         * Fades with the drag rather than switching, so releasing back into
-         * fullscreen does not flash.
+         * A permanent node whose alpha is read in DRAW scope: the fade tracks
+         * the finger frame by frame, and reading progress here in composition
+         * would rebuild the whole surface per frame for one rectangle.
          */
-        /*
-         * Behind the player: hides the host's page, permanently in fullscreen
-         * and progressively during a drag-up. It has nothing to do with the
-         * switch — covering that is the shutter's job, drawn over everything at
-         * the end of this composable.
-         */
-        val backdrop = if (fullscreen) 1f else (p * 0.5f).coerceIn(0f, 0.5f)
-        if (backdrop > 0.01f) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = backdrop)),
-            )
-        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    /*
+                     * Also carries the transition cover now.
+                     *
+                     * The shutter used to be a second layer drawn over
+                     * everything, video included, so the rotation happened
+                     * entirely out of sight — correct, but it meant a few
+                     * hundred milliseconds of blank screen with the video
+                     * reappearing only after it finished. Folded in here,
+                     * BEHIND the video: the page and chrome stay hidden while
+                     * the video itself remains visible and rotates with the
+                     * system.
+                     */
+                    val alpha = maxOf(
+                        if (fullscreen) 1f else (currentDragOffset() * 0.5f).coerceIn(0f, 0.5f),
+                        motion.curtain.value,
+                    )
+                    if (alpha > 0.01f) drawRect(Color.Black.copy(alpha = alpha))
+                },
+        )
 
         Box(
             Modifier
@@ -484,43 +531,32 @@ internal fun PipePlayerSurface(
         ) {
         Box(
             Modifier
+                /*
+                 * The drag's translation lives INSIDE this lambda, so a moving
+                 * finger invalidates placement only. The rest centre is a
+                 * composition value because it changes only with state; the
+                 * shift changes per frame and is read where per-frame is cheap.
+                 */
                 .offset {
                     IntOffset(
-                        (centreX - width / 2f).roundToInt(),
-                        (centreY - height / 2f).roundToInt(),
+                        (restCentreX - restWidth / 2f).roundToInt(),
+                        (restCentreY + currentShift() - restHeight / 2f).roundToInt(),
                     )
                 }
                 /*
-                 * requiredSize, not size: at p = 1 the box is deliberately WIDER
-                 * than the screen (it is landscape, about to be rotated a quarter
-                 * turn). `size` still honours the parent's constraints, so the box
-                 * was clamped to screen width and the rotation happened about the
-                 * wrong centre — the video ended up jammed against the left edge.
-                 * requiredSize ignores incoming constraints, which is what a
-                 * child larger than its parent needs.
+                 * requiredSize, not size: fullscreen sizes the box to the whole
+                 * window, and the square overlay's own constraints must not
+                 * clamp it. requiredSize ignores incoming constraints, which is
+                 * what a child larger than its parent needs.
+                 *
+                 * Always the REST size. The pick-up shrink is a graphicsLayer
+                 * scale below, not a size change — resizing per drag frame
+                 * forced a full measure/layout pass per frame for a 6% effect.
                  */
                 .requiredSize(
-                    width = with(density) { width.toDp() },
-                    height = with(density) { height.toDp() },
+                    width = with(density) { restWidth.toDp() },
+                    height = with(density) { restHeight.toDp() },
                 )
-                // Rotation as a render-thread property, not a layout change: this
-                // moves every frame during a drag, and re-laying-out the tree
-                // per frame is the wrong cost model. Origin is the centre by
-                // default, which the interpolation above assumes.
-                /*
-                 * BEFORE graphicsLayer, and that placement is the whole fix.
-                 *
-                 * Pointer coordinates are transformed by every layer between the
-                 * gesture and the root. Placed after the rotation, this gesture
-                 * ran in the box's LOCAL space — where, at 90 degrees, a
-                 * screen-vertical swipe is horizontal. Orientation.Vertical saw
-                 * almost no movement, never passed slop, and swipe-to-dismiss
-                 * simply never fired in fullscreen. Dragging *into* fullscreen
-                 * always worked because at p = 0 there is no rotation to undo.
-                 *
-                 * Sitting outside the layer, it reads unrotated screen-space
-                 * movement, which is what "swipe down" means to a user.
-                 */
                 /*
                  * Modifier.draggable, not a raw pointerInput.
                  *
@@ -531,17 +567,17 @@ internal fun PipePlayerSurface(
                  * and fires on cancel too — so the tracker, the reset call and
                  * the separate cancel branch all go away.
                  *
-                 * `enabled` replaces the early returns: mini is a target rather
-                 * than a stage for gestures, and in PiP the system owns input.
+                 * BEFORE the graphicsLayer below, deliberately. Pointer
+                 * coordinates are transformed by every layer between the
+                 * gesture and the root — a rotation layer here once turned a
+                 * vertical swipe horizontal and killed the exit gesture
+                 * entirely. The pick-up scale is far milder, but the rule
+                 * stands: gestures read the space above any transform.
                  *
-                 * Deliberately NOT disabled when the Activity is really
-                 * landscape. It used to be, on the reasoning that a rotated
-                 * window IS the screen so there is nothing to expand into. True
-                 * while fullscreen was always faked, but the orientation
-                 * listener now rotates the Activity for real, so the guard
-                 * matched almost every fullscreen session and swipe-to-dismiss
-                 * silently stopped existing. Expanding is indeed a no-op there;
-                 * collapsing is not, and collapsing is the whole point.
+                 * `enabled` replaces the early returns: mini is a target rather
+                 * than a stage for gestures, in PiP the system owns input, and
+                 * during the commit choreography there is nothing to drag —
+                 * touching the shutter must not cancel the switch it covers.
                  */
                 .draggable(
                     state = dragState,
@@ -552,7 +588,8 @@ internal fun PipePlayerSurface(
                      * receiving events; collapsing shrinks the box away and is
                      * handled by the screen-sized node instead.
                      */
-                    enabled = !mini && !pip && (boxDragging || p <= 0.01f),
+                    enabled = !mini && !pip && !motion.transitioning &&
+                        (boxDragging || atDockedRest),
                     onDragStarted = {
                         boxDragging = true
                     },
@@ -571,15 +608,17 @@ internal fun PipePlayerSurface(
                     },
                 )
                 /*
-                 * No rotation here at all any more.
-                 *
-                 * Fullscreen is a genuinely landscape Activity, so the window is
-                 * already the right way round and there is nothing to fake. The
-                 * old `rotationZ = 90f * p` is what produced the mid-drag
-                 * skewing, and deleting it removes the second coordinate frame
-                 * along with it — a gesture now reads the same space it is drawn
-                 * in, whatever the state.
+                 * A touch smaller as it is dragged, so the gesture feels
+                 * physical. Tiny on purpose: this is feedback, not a
+                 * transformation. A layer property so each frame updates the
+                 * render node and nothing else; the default centre pivot keeps
+                 * the box centred exactly as the old size-based shrink did.
                  */
+                .graphicsLayer {
+                    val pickUp = 1f - 0.06f * currentResisted()
+                    scaleX = pickUp
+                    scaleY = pickUp
+                }
                 /*
                  * Rounded and lifted, but only as it becomes the corner window.
                  *
@@ -621,7 +660,7 @@ internal fun PipePlayerSurface(
                  * layout — the margins exist to clear the host's own chrome, and
                  * only the corners honour them.
                  */
-                .pointerInput(mini, miniConfig.draggable, screenW, screenH) {
+                .pointerInput(mini, miniConfig, screenW, screenH) {
                     if (!mini || !miniConfig.draggable) return@pointerInput
                     detectDragGestures(
                         onDragEnd = {
@@ -640,8 +679,11 @@ internal fun PipePlayerSurface(
                              *
                              * `miniCorner` and `miniDrag` are state delegates,
                              * so reading them here reads them now. The paddings
-                             * and sizes are captured, which is fine: they only
-                             * change with the screen, and that IS a key.
+                             * and sizes are captured, which is safe only because
+                             * everything they derive from is a key: the screen,
+                             * and `miniConfig` itself — the host can reconfigure
+                             * mini geometry at any moment, so the config being a
+                             * key is what keeps these captures current.
                              */
                             val left = if (miniCorner.isLeft) {
                                 padLeft
@@ -718,7 +760,9 @@ internal fun PipePlayerSurface(
              * something if there are bars to crop.
              */
             val aspect = videoAspect.value
-            val boxAspect = if (height > 0f) width / height else 1f
+            // Rest dimensions: the pick-up scale is uniform, so it cancels out
+            // of the ratio anyway.
+            val boxAspect = if (restHeight > 0f) restWidth / restHeight else 1f
 
             /*
              * Source size for resizeWithContentScale. Only the RATIO matters —
@@ -768,7 +812,7 @@ internal fun PipePlayerSurface(
 
             // Zoom is a fullscreen affordance; carrying a 2x crop back down into
             // a small docked rect would leave the host with a mystery.
-            LaunchedEffect(p < 0.01f) { if (p < 0.01f) zoom = 1f }
+            LaunchedEffect(atDockedRest) { if (atDockedRest) zoom = 1f }
 
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 /*
@@ -993,6 +1037,7 @@ internal fun PipePlayerSurface(
                 ) {
                     PipePlayerCompactChrome(
                         state = chromeState,
+                        position = position,
                         callbacks = chromeCallbacks,
                         showButtons = !pip,
                     )
@@ -1027,6 +1072,8 @@ internal fun PipePlayerSurface(
                          * might still be dragged back.
                          */
                         state = chromeState.copy(fullscreen = motion.committed),
+                        position = position,
+                        buffered = buffered,
                         callbacks = chromeCallbacks,
                     )
                 }
@@ -1035,27 +1082,6 @@ internal fun PipePlayerSurface(
         }
         }
 
-        /*
-         * The shutter, drawn LAST so it covers the player as well as the page.
-         *
-         * This is the fix a frame-by-frame recording forced: as a backdrop it
-         * sat behind the video, so the player resizing to fullscreen inside a
-         * still-portrait window — and its chrome swapping to the landscape
-         * layout — were both plainly visible before the system rotated. Drawn
-         * over the top, the whole switch is simply black.
-         *
-         * Deliberately not clickable: it is opaque for a few hundred
-         * milliseconds, and swallowing touches for that long would feel like
-         * the app had hung. It draws; it does not intercept.
-         */
-        val shutter = motion.curtain.value
-        if (shutter > 0.001f) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = shutter.coerceIn(0f, 1f))),
-            )
-        }
     }
 }
 

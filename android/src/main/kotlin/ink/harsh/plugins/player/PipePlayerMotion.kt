@@ -11,24 +11,21 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import androidx.compose.animation.core.tween
-import kotlin.math.abs
 
 /**
- * The single value the whole window transform runs on.
+ * The state machine the docked/fullscreen switch runs on.
  *
- * `progress` is 0 when docked and 1 when fullscreen, and **every value
- * between is a renderable frame**. That is the property the feature exists for:
- * a drag can be tracked, reversed mid-flight and released at any point, because
- * there is no discrete state to be caught between.
- *
- * It is also why fullscreen is a view transform rather than an OS
- * orientation change. A configuration change is a discrete event — it cannot be
- * driven continuously by a finger, and it would rotate the host's WebView
- * underneath.
+ * `progress` is a DRAG OFFSET in travel units — 0 at the docked rest, 1 at the
+ * fullscreen rest — not a shape parameter; the surface only translates the
+ * video along it with rubber-band resistance. The state itself is [committed],
+ * latched on release, and the change is carried by a real orientation change
+ * behind [curtain]. Nothing between the two states is ever rendered — that
+ * discreteness is the model (CLAUDE.md Gotcha 24), arrived at after the
+ * continuous interpolate-and-rotate version proved unfixable.
  */
 class PipePlayerMotion {
 
-    /** 0 = docked, 1 = fullscreen. Never leaves [0, 1]. */
+    /** 0 = docked rest, 1 = fullscreen rest. Never leaves [0, 1]. */
     val progress = Animatable(0f)
 
     /**
@@ -105,17 +102,6 @@ class PipePlayerMotion {
     }
 
     /**
-     * Release, seeded with the finger's exit velocity.
-     *
-     * This is the highest-leverage detail in the whole module. A release that
-     * restarts from zero velocity on a fixed-duration curve reads as wrong
-     * immediately, and no amount of curve-tweaking rescues it — the hand-off has
-     * to preserve the momentum the finger already had. Hence a spring seeded
-     * with `initialVelocity` rather than an animator with a duration.
-     *
-     * @param velocity progress-units per second, positive toward fullscreen
-     */
-    /**
      * Decide, then snap the drag offset away.
      *
      * The gesture no longer renders intermediate states — the video translates
@@ -125,24 +111,56 @@ class PipePlayerMotion {
      *
      * `initialVelocity` still matters: the snap picks up the momentum the finger
      * had, which is what keeps a flick feeling like a flick.
+     *
+     * @param velocity progress-units per second, positive toward fullscreen
      */
     suspend fun release(velocity: Float) {
         commit(decideTarget(progress.value, velocity), velocity)
     }
 
     /** Jump without a gesture — a button, or a host command. */
-    /** Jump without a gesture — a button, or a host command. */
     suspend fun animateTo(fullscreen: Boolean) {
         commit(if (fullscreen) 1f else 0f, 0f)
     }
+
+    /**
+     * Put every axis back to its docked rest, for a detach.
+     *
+     * The motion object outlives the overlay's view tree, so without this a
+     * re-attach resurrected whatever state the last session ended in — a player
+     * that believed it was fullscreen docking into a portrait page. Bumping the
+     * generation first orphans any commit still in flight; its stage checks and
+     * guarded cleanup then let the reset own the field.
+     */
+    suspend fun reset() {
+        commitGeneration++
+        transitioning = false
+        committed = false
+        progress.snapTo(0f)
+        curtain.snapTo(0f)
+        miniProgress.snapTo(0f)
+    }
+
+    /**
+     * Which commit currently owns the choreography.
+     *
+     * Two commits can overlap: a button press during a settle, a host command
+     * during a gesture's release. The Animatables already referee the *values*
+     * — a new mutation cancels the old — but the superseded commit's cleanup
+     * still ran, snapping the curtain away and clearing `transitioning` under
+     * the new commit's feet, uncovering exactly the switch it was hiding. Each
+     * commit takes a generation number; only the current holder may advance the
+     * choreography or clean it up.
+     */
+    private var commitGeneration = 0
 
     /**
      * Raise the curtain, switch, wait for the reflow, lower it.
      *
      * The order is the whole point. Everything that looks bad — the orientation
      * change, the window resize, the host page relaying out, the chrome
-     * swapping between portrait and landscape layouts — happens between the
-     * snapTo(1f) and the animateTo below, with the screen covered.
+     * swapping between portrait and landscape layouts — happens while the
+     * curtain is opaque, with the screen covered.
      */
     private suspend fun commit(target: Float, velocity: Float) {
         /*
@@ -154,12 +172,20 @@ class PipePlayerMotion {
          * worse than the transition it was meant to cover. Nothing is changing
          * state here; the only work is putting the drag offset and the curtain
          * back where they were.
+         *
+         * Unless a real commit toward this same state is already mid-flight:
+         * then there is nothing to put back, and animating here would cancel
+         * that commit's own animations and drop its curtain early. Let it
+         * finish.
          */
         if ((target > 0.5f) == committed) {
+            if (transitioning) return
             progress.animateTo(target, SNAP_BACK, velocity)
             curtain.animateTo(0f, tween(FADE_MS / 2))
             return
         }
+
+        val generation = ++commitGeneration
 
         /*
          * try/finally, because a stuck curtain is unrecoverable.
@@ -177,14 +203,38 @@ class PipePlayerMotion {
          */
         try {
             transitioning = true
-            curtain.snapTo(1f)
-            committed = target > 0.5f
+
+            /*
+             * Fade in when ENTERING, snap when LEAVING.
+             *
+             * Entering, the fade IS the start of the transition: it covers a
+             * bright page, and snapping there reads as a blink.
+             *
+             * Leaving, fading was actively wrong. The shutter rising over a
+             * landscape video made the video itself appear to dissolve, so a tap
+             * meant to leave fullscreen began by fading out what you were
+             * watching and only then rotated. Snapping makes the tap and the
+             * rotation the same instant, which is what leaving should feel like.
+             *
+             * Either way `committed` follows and never runs alongside: it moves
+             * the geometry and asks for the rotation, and doing that through a
+             * half-transparent shutter shows precisely what the shutter is for.
+             */
+            val entering = target > 0.5f
+            if (entering) {
+                curtain.animateTo(1f, tween(RAISE_MS))
+            } else {
+                curtain.snapTo(1f)
+            }
+            if (generation != commitGeneration) return
+            committed = entering
 
             progress.animateTo(
                 targetValue = target,
                 animationSpec = SNAP_BACK,
                 initialVelocity = velocity,
             )
+            if (generation != commitGeneration) return
 
             /*
              * Held deliberately past the animation.
@@ -206,23 +256,27 @@ class PipePlayerMotion {
              * The reflow is also cheaper in this direction, because the page is
              * returning to the portrait layout it was built for.
              */
-            val entering = committed
             val settle = awaitStable
             if (settle != null) {
                 settle()
             } else {
                 delay(if (entering) REFLOW_HOLD_MS else REFLOW_HOLD_MS / 2)
             }
-            curtain.animateTo(
-                targetValue = 0f,
-                animationSpec = tween(if (entering) FADE_MS else FADE_MS / 2),
-            )
+            // A newer commit may have started while this one waited out the
+            // settle; lowering the curtain now would uncover its switch.
+            if (generation != commitGeneration) return
+            curtain.animateTo(0f, tween(FADE_MS))
         } finally {
-            transitioning = false
-            // snapTo needs a scope; withContext(NonCancellable) keeps this
-            // running even when the reason we are here is cancellation.
-            withContext(NonCancellable) {
-                curtain.snapTo(0f)
+            // Only the commit that still owns the choreography may clean up. A
+            // superseded one leaves the field — curtain included — to its
+            // successor, whose own finally will lower it.
+            if (generation == commitGeneration) {
+                transitioning = false
+                // snapTo needs a scope; withContext(NonCancellable) keeps this
+                // running even when the reason we are here is cancellation.
+                withContext(NonCancellable) {
+                    curtain.snapTo(0f)
+                }
             }
         }
     }
@@ -270,53 +324,37 @@ class PipePlayerMotion {
         private const val COMMIT_VELOCITY = 1.2f
 
         /**
+         * How long the shutter takes to come up before anything switches.
+         *
+         * Short enough to feel like part of the same action as the tap, long
+         * enough to read as a fade rather than a blink.
+         */
+        private const val RAISE_MS = 140
+
+        /**
          * How long the curtain stays up after the transform has landed.
          *
          * Covers the asynchronous part: the orientation change, the window
          * resize and the host page's reflow, none of which are finished when
          * the animation is. Measured by eye — too short and the reflow shows,
-         * too long and the player feels sluggish to arrive.
+         * too long and the player feels sluggish to arrive. Only the fallback
+         * when [awaitStable] is absent; the overlay's geometry watcher is the
+         * real answer.
          */
         private const val REFLOW_HOLD_MS = 260L
-        private const val FADE_MS = 200
-
         /**
-         * Spring, not a duration.
-         *
-         * These are placeholders pending measurement. The plan's method is to
-         * screen-record YouTube at 60fps, step the frames, and read the two
-         * constants off the displacement curve — overshoot ratio gives the
-         * damping ratio, time to first peak gives the stiffness. Expand,
-         * collapse and the mini-player dock are separate curves; do not assume
-         * one fits all three.
+         * Lowering the shutter. Short on purpose: by this point everything
+         * underneath has settled, so the fade exists only to avoid a hard cut.
+         * Anything longer is the player making the user wait for nothing.
          */
-        private val SETTLE: AnimationSpec<Float> = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            /*
-             * Softer than StiffnessMediumLow (400f), which settled fast enough
-             * that the release read as a snap rather than as the finger's
-             * momentum running out. This is the whole-screen transform, and a
-             * big move that arrives instantly reads as a state change — which
-             * is exactly the impression a continuously-tracked gesture exists
-             * to avoid.
-             */
-            stiffness = 260f,
-            visibilityThreshold = 0.001f,
-        )
+        private const val FADE_MS = 120
 
-        /**
-         * The corner dock is its own curve, per the note above.
-         *
-         * Slightly stiffer than [SETTLE]: the travel is short and a soft spring
-         * over a short distance reads as sluggish rather than as gentle. Also a
-         * placeholder pending the same frame-stepping measurement.
-         */
         /**
          * Returning the drag offset to rest.
          *
-         * Stiffer than [SETTLE] on purpose: this travels a short distance and is
-         * competing with the system's rotation animation, so a soft spring reads
-         * as lag rather than as weight.
+         * Deliberately stiff: this travels a short distance and is competing
+         * with the system's rotation animation, so a soft spring reads as lag
+         * rather than as weight.
          */
         private val SNAP_BACK: AnimationSpec<Float> = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
@@ -324,6 +362,13 @@ class PipePlayerMotion {
             visibilityThreshold = 0.001f,
         )
 
+        /**
+         * The corner dock is its own curve.
+         *
+         * The travel is short, and a soft spring over a short distance reads as
+         * sluggish rather than as gentle. A placeholder pending frame-stepped
+         * measurement of the real thing.
+         */
         private val DOCK: AnimationSpec<Float> = spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMedium,
@@ -341,7 +386,7 @@ class PipePlayerMotion {
         fun decideTarget(progress: Float, velocity: Float): Float = when {
             velocity > COMMIT_VELOCITY -> 1f
             velocity < -COMMIT_VELOCITY -> 0f
-            abs(velocity) < COMMIT_VELOCITY && progress > 0.5f -> 1f
+            progress > 0.5f -> 1f
             else -> 0f
         }
     }
