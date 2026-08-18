@@ -24,6 +24,7 @@ android/src/main/kotlin/ink/harsh/plugins/pipe/
 android/libs/                 built extractor jars — SHIPPED, generated, not hand-edited
 submodules/PipePipeExtractor  pinned upstream, pristine
 submodules/NewPipeExtractor   pinned upstream, pristine
+tools/js/                     readable source for the WebView assets — EDIT HERE
 tools/shade/                  relocates NewPipeExtractor into a private namespace
 tools/force-java17.init.gradle  toolchain override for PipePipe (see Gotcha 1)
 scripts/                      build / update / verify
@@ -36,16 +37,42 @@ yourself wanting to change extractor source, wrap it on our side instead.
 ## Build
 
 ```bash
-npm run extractors:init      # git submodule update --init --recursive
-npm run extractors:build     # build both extractors -> android/libs/*.jar
-npm run build                # TypeScript + docgen
-npm run verify:android       # compile the Android module
+bun install                  # bun ONLY — npm/pnpm are refused, see Gotcha 13
+bun link                     # register the plugin for the example app
+bun run extractors:init      # git submodule update --init --recursive
+bun run extractors:build     # build both extractors -> android/libs/*.jar
+bun run assets:build         # obfuscate tools/js -> android/src/main/assets
+bun run build                # assets + TypeScript + docgen
+bun run test:assets          # run the shipped, obfuscated WebView asset
+bun run verify:android       # compile the Android module
 ```
+
+**JDK 21, not 17 and not 25.** The window is narrow and both edges fail with
+errors that name neither Java nor the JDK: on 17 `capacitor-android` dies with
+`invalid source release: 21`, and on 25 Gradle 8.14.3's Groovy cannot compile a
+build script at all — `BUG! exception in phase 'semantic analysis' ...
+Unsupported class file major version 69`, reported against `settings.gradle`.
+That second one hides behind Gradle's compiled-script cache, so it appears the
+first time a settings file changes rather than when the JDK does.
+
+```bash
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+```
+
+This is independent of Gotcha 1: that is about the *bytecode the extractors
+emit*, this is about the JVM Gradle itself runs on.
 
 `android/libs/*.jar` is generated but **committed and published** — npm tarballs
 cannot carry git submodules, so a consuming app never sees `submodules/`. The
 submodules are the development path; `android/libs/` is the published path.
-Regenerate with `npm run extractors:build`, never by hand.
+Regenerate with `bun run extractors:build`, never by hand.
+
+`android/src/main/assets/*.js` follows the same rule for the same reason. The
+readable source is `tools/js/`; the shipped asset is the obfuscated output of
+`bun run assets:build`, committed because a consuming app builds from our tree
+and never runs our scripts. **Edit `tools/js/`, never the asset.** Keeping the
+source readable is what makes re-syncing a PipePipeClient fix a translation
+rather than an excavation.
 
 ## Updating the extractors
 
@@ -341,11 +368,42 @@ distinctive name.
 to the app until `pnpm install` ran again — builds succeeded and the APK simply
 contained old code. Diagnosing a fixed bug that "won't go away" starts here.
 
-Now `"link:.."`, which symlinks the working tree. Verify with:
+The repo is now on **bun**, which has the same trap wearing different clothes.
+Both of the obvious spellings are wrong:
+
+| Spelling | What bun does | Result |
+|---|---|---|
+| `"file:.."` | copies the directory | Gotcha 13 all over again |
+| `"link:.."` | looks up `..` in the **global link store** | resolves to `~/.bun/install/global`, which does not exist |
+
+`link:` in bun means "a package registered with `bun link`" — it is not a
+relative path, unlike npm and pnpm. The working combination is a one-time
+registration in the plugin root plus a named link in the app:
+
+```bash
+bun link                              # in the repo root, registers capacitor-pipe
+cd example-app && bun install         # dependency is "capacitor-pipe": "link:capacitor-pipe"
+```
+
+`bun link` is **required after a fresh clone** — nothing in `bun install` does it
+for you, and skipping it gives an unresolvable dependency rather than a stale
+one, so at least it fails loudly. Verify the link is real, not a copy:
 
 ```bash
 ls -la example-app/node_modules | grep capacitor-pipe   # -> ../..
 ```
+
+An inode comparison is the check that cannot be fooled — a copy passes a casual
+`ls`:
+
+```bash
+stat -f "%i %N" example-app/node_modules/capacitor-pipe/package.json package.json
+```
+
+Related: `android/capacitor.settings.gradle` is generated and hardcodes the
+node_modules layout, so it still pointed into `node_modules/.pnpm/...` after the
+switch. Run `bunx cap update android` after changing package manager, or the
+Android build fails with "No variants exist" for `:capacitor-android`.
 
 ### 14. PipePipeClient lives on Codeberg
 

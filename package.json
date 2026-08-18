@@ -38,23 +38,26 @@
     "exoplayer"
   ],
   "scripts": {
-    "verify": "npm run verify:android && npm run verify:web",
+    "verify": "bun run verify:android && bun run verify:web",
     "verify:android": "cd android && ./gradlew clean build test && cd ..",
-    "verify:web": "npm run build",
-    "lint": "npm run eslint && npm run prettier -- --check",
-    "fmt": "npm run eslint -- --fix && npm run prettier -- --write",
+    "verify:web": "bun run build && bun run test:assets",
+    "lint": "bun run eslint && bun run prettier -- --check",
+    "fmt": "bun run eslint -- --fix && bun run prettier -- --write",
     "eslint": "eslint . --ext ts",
     "prettier": "prettier \"**/*.{css,html,ts,js,java}\" --plugin=prettier-plugin-java",
-    "docgen": "docgen --api PipePlugin --output-readme README.md --output-json dist/docs.json && npm run docgen:player",
-    "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.mjs",
+    "docgen": "docgen --api PipePlugin --output-readme README.md --output-json dist/docs.json && bun run docgen:player",
+    "build": "bun run clean && bun run assets:build && bun run docgen && tsc && rollup -c rollup.config.mjs",
     "clean": "rimraf ./dist",
     "watch": "tsc --watch",
     "extractors:init": "git submodule update --init --recursive",
     "extractors:build": "./scripts/build-extractors.sh",
     "extractors:update": "./scripts/update-extractors.sh",
     "extractors:check": "./scripts/check-divergences.sh",
-    "prepublishOnly": "npm run build",
-    "docgen:player": "docgen --api PipePlayerPlugin --output-readme PLAYER.md --output-json dist/docs-player.json"
+    "prepublishOnly": "bun run build",
+    "docgen:player": "docgen --api PipePlayerPlugin --output-readme PLAYER.md --output-json dist/docs-player.json",
+    "assets:build": "./scripts/build-assets.sh",
+    "test:assets": "node scripts/test-assets.mjs",
+    "preinstall": "node ./scripts/only-bun.mjs"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.0",
@@ -67,6 +70,7 @@
     "prettier-plugin-java": "^2.6.6",
     "rimraf": "^6.0.1",
     "rollup": "^4.30.1",
+    "terser": "^5.50.0",
     "typescript": "~4.1.5"
   },
   "peerDependencies": {
@@ -81,5 +85,8 @@
       "src": "android"
     }
   },
-  "packageManager": "pnpm@10.11.0"
+  "packageManager": "bun@1.3.14",
+  "engines": {
+    "bun": ">=1.3.0"
+  }
 }
