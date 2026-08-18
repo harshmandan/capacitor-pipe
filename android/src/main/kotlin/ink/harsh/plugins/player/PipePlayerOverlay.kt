@@ -959,11 +959,22 @@ class PipePlayerOverlay(private val activity: Activity) {
                 activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
             }
         } else {
-            // Leaving fullscreen is a decision the sensor must now respect, or
-            // it re-expands on its next reading while the phone is still on its
-            // side. `lastLandscape` is deliberately left alone: clearing it
-            // would make that same reading look like a fresh turn.
-            suppressAutoFullscreen = true
+            /*
+             * Suppress the sensor ONLY if the phone is actually sideways.
+             *
+             * The flag exists for one case: exiting fullscreen while still
+             * holding the phone in landscape, where the next sensor reading
+             * would otherwise re-expand immediately. Setting it unconditionally
+             * made it stick — exit while already upright and nothing clears it,
+             * because the sensor emits no event when the device has not moved.
+             * Rotating the phone then did nothing at all, in whichever direction
+             * happened to be tried first.
+             *
+             * Deciding from the CURRENT configuration keeps it to the case it
+             * was written for. `lastLandscape` is still left alone: clearing it
+             * would make that same next reading look like a fresh turn.
+             */
+            suppressAutoFullscreen = landscape
             if (landscape) {
                 activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             }

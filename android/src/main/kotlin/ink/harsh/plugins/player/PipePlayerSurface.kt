@@ -4,6 +4,9 @@ import android.graphics.RectF
 import android.util.Log
 import android.view.TextureView
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -201,7 +204,16 @@ internal fun PipePlayerSurface(
          * jumping.
          */
         var miniCorner by remember(miniConfig.corner) { mutableStateOf(miniConfig.corner) }
-        var miniDrag by remember { mutableStateOf(Offset.Zero) }
+
+        /*
+         * Animatable, so releasing SLIDES to the corner instead of jumping.
+         *
+         * It was a plain state zeroed on release, which teleported the window:
+         * the anchor moves to the new corner and the offset vanishes in the same
+         * frame. Animating the offset home — after compensating for the anchor
+         * having moved — turns those two changes into one continuous move.
+         */
+        val miniDrag = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
 
         val cornerLeft = geo.screenX + if (miniCorner.isLeft) {
             padLeft
@@ -214,10 +226,10 @@ internal fun PipePlayerSurface(
             screenH - miniHeight - padBottom
         }
         val corner = RectF(
-            cornerLeft + miniDrag.x,
-            cornerTop + miniDrag.y,
-            cornerLeft + miniWidth + miniDrag.x,
-            cornerTop + miniHeight + miniDrag.y,
+            cornerLeft + miniDrag.value.x,
+            cornerTop + miniDrag.value.y,
+            cornerLeft + miniWidth + miniDrag.value.x,
+            cornerTop + miniHeight + miniDrag.value.y,
         )
 
         /*
@@ -600,21 +612,81 @@ internal fun PipePlayerSurface(
                     if (!mini || !miniConfig.draggable) return@pointerInput
                     detectDragGestures(
                         onDragEnd = {
+                            /*
+                             * Recomputed from live state, NOT from the captured
+                             * `corner` rect.
+                             *
+                             * pointerInput keeps the lambda it was created with,
+                             * and it is not keyed on the corner or the drag
+                             * offset — so `corner` here was frozen at the value
+                             * it had when the gesture detector was installed.
+                             * Every release therefore measured the ORIGINAL
+                             * position and snapped back to the same corner, no
+                             * matter where the window had been dragged. It
+                             * looked like snapping was not implemented at all.
+                             *
+                             * `miniCorner` and `miniDrag` are state delegates,
+                             * so reading them here reads them now. The paddings
+                             * and sizes are captured, which is fine: they only
+                             * change with the screen, and that IS a key.
+                             */
+                            val left = if (miniCorner.isLeft) {
+                                padLeft
+                            } else {
+                                screenW - miniWidth - padRight
+                            }
+                            val top = if (miniCorner.isTop) {
+                                padTop
+                            } else {
+                                screenH - miniHeight - padBottom
+                            }
                             val settled = PipePlayerCorner.nearest(
-                                centreX = corner.centerX() - geo.screenX,
-                                centreY = corner.centerY() - geo.screenY,
+                                centreX = left + miniDrag.value.x + miniWidth / 2f,
+                                centreY = top + miniDrag.value.y + miniHeight / 2f,
                                 width = screenW,
                                 height = screenH,
                             )
-                            // Corner first, offset second: the rect recomputes
-                            // around the new corner, and zeroing the drag then
-                            // animates it home rather than teleporting.
+                            val newLeft = if (settled.isLeft) {
+                                padLeft
+                            } else {
+                                screenW - miniWidth - padRight
+                            }
+                            val newTop = if (settled.isTop) {
+                                padTop
+                            } else {
+                                screenH - miniHeight - padBottom
+                            }
+                            /*
+                             * Compensate, then animate home.
+                             *
+                             * Changing the corner moves the anchor instantly, so
+                             * the offset has to absorb that jump in the same
+                             * frame to keep the window exactly where the finger
+                             * left it. Animating to zero from there is what makes
+                             * it travel to the new corner rather than appear in
+                             * it.
+                             */
+                            val carried = Offset(
+                                left - newLeft + miniDrag.value.x,
+                                top - newTop + miniDrag.value.y,
+                            )
                             miniCorner = settled
-                            miniDrag = Offset.Zero
+                            scope.launch {
+                                miniDrag.snapTo(carried)
+                                miniDrag.animateTo(
+                                    targetValue = Offset.Zero,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMedium,
+                                    ),
+                                )
+                            }
                         },
-                        onDragCancel = { miniDrag = Offset.Zero },
+                        onDragCancel = {
+                            scope.launch { miniDrag.animateTo(Offset.Zero) }
+                        },
                     ) { change, dragAmount ->
-                        miniDrag += dragAmount
+                        scope.launch { miniDrag.snapTo(miniDrag.value + dragAmount) }
                         change.consume()
                     }
                 }
