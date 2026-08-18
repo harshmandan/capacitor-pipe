@@ -503,7 +503,39 @@ tracking it was meant to fix looked fine.
 Change one, recompute the other. And test with a SHORT flick: a long synthetic
 swipe commits on distance alone and hides exactly this failure.
 
-### 24. KDoc is Markdown, not Javadoc
+### 24. Fullscreen is a discrete switch behind a shutter
+
+Fullscreen was once a continuous interpolation between the docked rect and the
+screen, rotating 90° as it went. Every intermediate frame was then a video at
+some angle, mid-reshape — not a tuning problem but the wrong model, which is why
+YouTube never shows you one.
+
+The model now: the drag **translates** the video with rubber-band resistance and
+nothing else; the state change is **discrete, on release**, carried by the
+system's own rotation; and steady-state fullscreen is a genuinely landscape
+Activity, so there is one coordinate frame rather than two.
+
+Three rules that each cost a debugging round:
+
+- **Every consequence of fullscreen reads `motion.committed`, never `progress`.**
+  Geometry, system bars, chrome layout and orientation each leaked in turn: a
+  drag past halfway hid the navigation bar, grew the buttons and showed the
+  title, over a player that had not moved and could still be dragged back.
+- **Two black layers, different jobs.** The *backdrop* sits behind the player and
+  hides the host's page. The *shutter* is drawn last, over the player and its
+  chrome, and hides the switch. Conflating them left the player's own resize and
+  chrome swap fully visible — frame-stepping a recording is what showed it.
+- **The commit outlives the gesture.** Committing detaches the drag modifier,
+  which cancels its coroutine; running the choreography there killed it at the
+  delay and left the screen black over a working player. Launch it on the
+  surface's scope, and clean up in a `finally`.
+
+Lowering the shutter waits for the geometry to stop moving rather than a fixed
+delay — the orientation change, window resize and the host's re-`dock()` land
+whenever they land. See `PipePlayerOverlay.awaitStableGeometry`, bounded so a
+host that re-docks forever cannot pin the shutter up.
+
+### 25. KDoc is Markdown, not Javadoc
 
 Six player files carried `<p>`, `<b>`, `<pre>` and `{@link}` — habits that came
 across with the ported Java sources. None of it renders: KDoc uses Markdown, so

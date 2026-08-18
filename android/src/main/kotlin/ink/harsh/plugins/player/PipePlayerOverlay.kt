@@ -59,6 +59,11 @@ class PipePlayerOverlay(private val activity: Activity) {
     private companion object {
         const val TAG = "PipePlayerOverlay"
 
+        /** How long nothing may move before the curtain is allowed down. */
+        const val STABLE_QUIET_MS = 90L
+        const val STABLE_POLL_MS = 16L
+        const val STABLE_TIMEOUT_MS = 700L
+
         /**
          * core-pip is compileOnly, so its absence is a normal state.
          *
@@ -88,7 +93,7 @@ class PipePlayerOverlay(private val activity: Activity) {
     private val dockRect = mutableStateOf<RectF?>(null)
 
     /** The single value the docked <-> fullscreen transform runs on. */
-    val motion = PipePlayerMotion()
+    val motion = PipePlayerMotion().also { it.awaitStable = ::awaitStableGeometry }
 
     /**
      * Where the host and the display sit inside the square overlay, measured.
@@ -375,6 +380,7 @@ class PipePlayerOverlay(private val activity: Activity) {
                     pip?.setPlayerView(texture)
                 },
                 onImmersiveChanged = ::setImmersive,
+                onFullscreenSettled = ::setFullscreenSettled,
             )
         }
         /*
@@ -462,6 +468,9 @@ class PipePlayerOverlay(private val activity: Activity) {
      * precisely the signal to fall back to the mini-player later.
      */
     fun dock(rect: RectF) {
+        // A re-dock after a reflow is the host telling us it has moved, so it
+        // counts toward the same quiet period the curtain waits on.
+        if (dockRect.value != rect) geometryChangedAt = android.os.SystemClock.uptimeMillis()
         dockRect.value = rect
         Log.i(TAG, "docked at $rect")
     }
@@ -480,6 +489,7 @@ class PipePlayerOverlay(private val activity: Activity) {
     fun setImmersive(immersive: Boolean) {
         val window = activity.window ?: return
         val controller = WindowCompat.getInsetsController(window, window.decorView)
+
 
         /*
          * Hiding the bars is not enough on its own: while the decor still fits
@@ -502,29 +512,6 @@ class PipePlayerOverlay(private val activity: Activity) {
         } else {
             controller.show(WindowInsetsCompat.Type.systemBars())
 
-            // Leaving fullscreen is a decision the sensor must now respect.
-            suppressAutoFullscreen = true
-
-            /*
-             * Leaving fullscreen means leaving landscape, even when the phone is
-             * still physically on its side.
-             *
-             * Swiping down while the Activity had really rotated used to drop a
-             * docked player into a landscape web page — the host is written for
-             * portrait, so that is a broken page, not a layout choice.
-             *
-             * Note what is deliberately NOT done here: the orientation
-             * listener's `lastLandscape` is left alone. Clearing it would make
-             * the very next sensor reading — still landscape, since the phone
-             * has not moved — look like a fresh turn and throw the player
-             * straight back into fullscreen. Leaving it set means nothing more
-             * happens until the device is genuinely turned upright again.
-             */
-            if (activity.resources.configuration.orientation ==
-                Configuration.ORIENTATION_LANDSCAPE
-            ) {
-                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            }
         }
 
         // The content view is about to resize; the overlay's coordinate space
@@ -825,6 +812,31 @@ class PipePlayerOverlay(private val activity: Activity) {
 
     private val geometryListener = ViewTreeObserver.OnGlobalLayoutListener { measureGeometry() }
 
+    /** When the player's geometry last actually moved. */
+    private var geometryChangedAt = 0L
+
+    /**
+     * Block until nothing has moved for a short while.
+     *
+     * Both inputs matter and they arrive separately: our own measured geometry
+     * changes when the window resizes, and the host's dock rect changes when its
+     * page finishes reflowing and calls `dock()` again. Waiting on a quiet
+     * period covers both without needing to know which is slower on a given
+     * device.
+     *
+     * Bounded, because a host that re-docks continuously would otherwise hold
+     * the curtain up forever. Hitting the cap shows a little reflow; never
+     * lowering the curtain hides the app.
+     */
+    private suspend fun awaitStableGeometry() {
+        val deadline = android.os.SystemClock.uptimeMillis() + STABLE_TIMEOUT_MS
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            val quietFor = android.os.SystemClock.uptimeMillis() - geometryChangedAt
+            if (quietFor >= STABLE_QUIET_MS) return
+            delay(STABLE_POLL_MS)
+        }
+    }
+
     /**
      * The current window's bounds, system bars included, in screen coordinates.
      *
@@ -885,7 +897,7 @@ class PipePlayerOverlay(private val activity: Activity) {
             "geom pip=${inPip.value} square=${squareLocation[0]},${squareLocation[1]} " +
                 "host=${hostLocation[0]},${hostLocation[1]} bounds=${bounds.width()}x${bounds.height()}",
         )
-        geometry.value = PipePlayerGeometry(
+        val measured = PipePlayerGeometry(
             hostX = (hostLocation[0] - squareLocation[0]).toFloat(),
             hostY = (hostLocation[1] - squareLocation[1]).toFloat(),
             /*
@@ -906,6 +918,56 @@ class PipePlayerOverlay(private val activity: Activity) {
             screenW = bounds.width().toFloat(),
             screenH = bounds.height().toFloat(),
         )
+        // Only a real change counts as movement; an identical re-measure would
+        // otherwise keep resetting the quiet period and hold the curtain up.
+        if (measured != geometry.value) {
+            geometry.value = measured
+            geometryChangedAt = android.os.SystemClock.uptimeMillis()
+        }
+    }
+
+    /**
+     * Make fullscreen a genuinely landscape Activity, once it has settled.
+     *
+     * The transform is faked *during* the drag because a configuration change is
+     * discrete — there is no 37% of an orientation change, and every
+     * intermediate position of a drag has to be renderable. But leaving the fake
+     * rotation in place afterwards meant one visual state had two coordinate
+     * frames, and that duality caused its own run of bugs: the viewer's "down"
+     * was the video's down rather than the window's, so the exit gesture
+     * tracked and then moved the player the wrong way; sheets opened upright in
+     * their own window over a sideways video.
+     *
+     * Swapping only when settled is what keeps it seamless — and why this is NOT
+     * driven from the same midpoint that hides the system bars. A config change
+     * partway through a drag would reflow the host page under the finger, which
+     * is the exact thing this design exists to avoid.
+     *
+     * The video does not move at the swap: the surface applies its own rotation
+     * only while the Activity is portrait, so the fake rotation switches off in
+     * the same frame the real one arrives.
+     *
+     * Stated plainly, the cost: the host page reflows once on entering
+     * fullscreen, where before it never did. That is the price of steady-state
+     * fullscreen being an ordinary landscape window.
+     */
+    fun setFullscreenSettled(fullscreen: Boolean) {
+        val landscape = activity.resources.configuration.orientation ==
+            Configuration.ORIENTATION_LANDSCAPE
+        if (fullscreen) {
+            if (!landscape) {
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            }
+        } else {
+            // Leaving fullscreen is a decision the sensor must now respect, or
+            // it re-expands on its next reading while the phone is still on its
+            // side. `lastLandscape` is deliberately left alone: clearing it
+            // would make that same reading look like a fresh turn.
+            suppressAutoFullscreen = true
+            if (landscape) {
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
+        }
     }
 
     /**

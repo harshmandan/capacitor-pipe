@@ -64,6 +64,22 @@ edge to play faster through, so the rate would climb, hit the edge and stall.
 Note the current scrubber treats live as "at the live edge" and does not model a
 DVR window — behind-the-edge playback shows a full bar.
 
+## Do not lock your Activity to portrait
+
+```xml
+<!-- NOT this, if you use the player -->
+<activity android:screenOrientation="portrait" />
+```
+
+Fullscreen is a genuinely landscape Activity. The drag that gets you there is
+faked — a config change cannot be driven continuously by a finger — but the
+settled state is real, so a portrait lock silently vetoes it and leaves the
+player in a rotated-inside-portrait limbo with two coordinate frames.
+
+Keep `android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"`
+on the activity. With it, rotating relayouts the Activity instead of recreating
+it, so the player keeps its surface and playback never stops.
+
 ## The player outlives your pages
 
 There is one player, and **pages lend it a rectangle**. `dock()` means "while

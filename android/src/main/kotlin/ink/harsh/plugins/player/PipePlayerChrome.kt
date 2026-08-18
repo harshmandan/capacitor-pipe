@@ -4,9 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -210,35 +208,37 @@ private fun TopRow(
     ) {
         /*
          * Minimise: docked only, and only where shrinking leads somewhere.
-         * Slides out to the left, positioned absolutely so its removal never
-         * moves the title.
+         * Positioned absolutely so its absence never moves the title.
          *
          * Hidden when PiP is unavailable. A control that visibly does nothing
          * is worse than an absent one — and the host cannot reason about it
          * either, since PiP needs a manifest entry and a dependency that a
          * plugin cannot supply on the host's behalf.
          */
-        AnimatedVisibility(
-            visible = !state.fullscreen && state.canMinimise,
-            enter = slideInHorizontally { -it } + fadeIn(),
-            exit = slideOutHorizontally { -it } + fadeOut(),
-            modifier = Modifier.align(Alignment.TopStart),
-        ) {
-            ChromeButton(Icons.Filled.KeyboardArrowDown, callbacks.onMinimise, metrics)
+        /*
+         * Shown or not shown — no slide.
+         *
+         * The animation existed to soften a change that happened in view. It no
+         * longer does: the fullscreen switch now happens behind an opaque
+         * curtain, so anything animating here is either invisible or, worse,
+         * still mid-slide when the curtain lifts. Cheaper and steadier to have
+         * the chrome simply be correct for the state it is in.
+         */
+        if (!state.fullscreen && state.canMinimise) {
+            Box(Modifier.align(Alignment.TopStart)) {
+                ChromeButton(Icons.Filled.KeyboardArrowDown, callbacks.onMinimise, metrics)
+            }
         }
 
-        // Title block: fades and slides in from the right, and always starts at
-        // the same x whether or not the minimise button is present.
-        AnimatedVisibility(
-            visible = state.fullscreen && (state.title != null || state.subtitle != null),
-            enter = slideInHorizontally { it / 3 } + fadeIn(),
-            exit = slideOutHorizontally { it / 3 } + fadeOut(),
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                // Reserve room for the button row so a long title never runs
-                // underneath it.
-                .padding(end = metrics.control * 4),
-        ) {
+        // Fullscreen only, and without a transition — see the note above.
+        if (state.fullscreen && (state.title != null || state.subtitle != null)) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    // Reserve room for the button row so a long title never runs
+                    // underneath it.
+                    .padding(end = metrics.control * 4),
+            ) {
             Column {
                 state.title?.let { title ->
                     BasicText(
@@ -261,6 +261,7 @@ private fun TopRow(
                         maxLines = 1,
                     )
                 }
+            }
             }
         }
 

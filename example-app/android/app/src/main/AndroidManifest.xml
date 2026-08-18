@@ -13,11 +13,15 @@
           android:supportsPictureInPicture is declared by the HOST, not by the
           plugin: a library manifest cannot merge into an activity whose name it
           does not know. Without it, configure({pip:true}) is a silent no-op.
+
+          Note there is NO android:screenOrientation="portrait" here. The player
+          makes fullscreen a genuinely landscape Activity once the transform
+          settles, and a portrait lock would silently veto that — leaving the
+          fake rotation in place and the two coordinate frames it brings.
         -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
-            android:screenOrientation="portrait"
             android:supportsPictureInPicture="true"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
