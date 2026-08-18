@@ -1,0 +1,128 @@
+.googlevideo.com
+(Lcom/grack/nanojson/JsonObject;Lorg/schabi/newpipe/extractor/services/youtube/YoutubeChannelHelper$ChannelHeader;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lorg/schabi/newpipe/extractor/StreamingService;Lorg/schabi/newpipe/extractor/linkhandler/ListLinkHandler;)Lorg/schabi/newpipe/extractor/channel/tabs/ChannelTabExtractor;
+charts.youtube.com
+com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip
+com.google.android.youtube/21.03.36 (Linux; U; Android 15; 
+com.google.ios.youtube/19.45.4(iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X; 
+com.google.ios.youtube/21.03.2(iPhone16,2; U; CPU iOS 18_7_2 like Mac OS X; 
+com.google.visionos.youtube/1.02(RealityDevice14,1; U; CPU visionOS 25_6_0 like Mac OS X; 
+Could not create a YouTube playlist from a valid playlist ID
+Could not extract YouTube WEB InnerTube client version from HTML search results page
+Could not extract YouTube WEB InnerTube client version from sw.js
+Could not get YouTube channel tab continuation items
+Could not get YouTube channel tab sort continuation
+Could not get YouTube WEB client version
+googlevideo.com
+https://api.pipepipe.dev/decoder/decode
+https://api.pipepipe.dev/decoder/decode?player=
+https://api.pipepipe.dev/decoder/latest-player
+https://charts.youtube.com
+https://charts.youtube.com/charts/TrendingTrailers
+https://charts.youtube.com/charts/TrendingVideos/RightNow
+https://charts.youtube.com/youtubei/v1/browse?alt=json&prettyPrint=false
+https://i.ytimg.com/vi/
+https://music.youtube.com
+https://music.youtube.com/?ucbcb=1
+https://music.youtube.com/playlist?list=
+https://music.youtube.com/search?q=
+https://music.youtube.com/sw.js
+https://music.youtube.com/watch?v=
+https://music.youtube.com/youtubei/v1/music/get_search_suggestions?prettyPrint=false
+https://music.youtube.com/youtubei/v1/search?ctoken=
+https://music.youtube.com/youtubei/v1/search?prettyPrint=false
+https://returnyoutubedislikeapi.com/votes?videoId=
+https://suggestqueries-clients6.youtube.com/complete/search?client=youtube&ds=yt&gl=
+https://suggestqueries.google.com/complete/search?client=youtube&jsonp=JP&ds=yt&gl=
+https://takeout.google.com/takeout/custom/youtube
+https://www.youtube.com
+https://www.youtube.com/
+https://www.youtube.com/channel/
+https://www.youtube.com/channel/UC4R8DWoMoI7CAwX8_LjQHig
+https://www.youtube.com/channel/UC4R8DWoMoI7CAwX8_LjQHig/livetab?ss=CKEK
+https://www.youtube.com/embed/
+https://www.youtube.com/feed/trending
+https://www.youtube.com/feeds/videos.xml?channel_id=
+https://www.youtube.com/feeds/videos.xml?user=
+https://www.youtube.com/gaming/trending
+https://www.youtube.com/iframe_api
+https://www.youtube.com/playlist?list=
+https://www.youtube.com/podcasts/popularepisodes
+https://www.youtube.com/redirect?
+https://www.youtube.com/results?search_query=
+https://www.youtube.com/results?search_query=&ucbcb=1
+https://www.youtube.com/s/player/%s/player_ias.vflset/en_GB/base.js
+https://www.youtube.com/s/player/0004de42/player_ias.vflset/en_GB/base.js
+https://www.youtube.com/sw.js
+https://www.youtube.com/watch?v=
+https://www.youtube.com/youtubei/v1/
+https://www.youtube.com/youtubei/v1/browse?prettyPrint=false
+https://www.youtube.com/youtubei/v1/guide?prettyPrint=false
+https://www.youtube.com/youtubei/v1/next
+https://www.youtube.com/youtubei/v1/next?prettyPrint=false
+https://www.youtube.com/youtubei/v1/player?prettyPrint=false
+https://www.youtube.com/youtubei/v1/player?prettyPrint=false&$fields=microformat,playabilityStatus,storyboards,videoDetails
+https://www.youtube.com/youtubei/v1/player?prettyPrint=false&$fields=microformat,videoDetails.thumbnail.thumbnails,videoDetails.videoId
+https://www.youtube.com/youtubei/v1/search?prettyPrint=false
+https://youtube.com
+https://youtubei.googleapis.com/youtubei/v1/
+https://youtubei.googleapis.com/youtubei/v1/player?prettyPrint=false&t=
+https://youtubei.googleapis.com/youtubei/v1/reel/reel_item_watch?prettyPrint=false&t=
+ink/harsh/pipe/shaded/org/schabi/newpipe/extractor/services/youtube/extractors/YoutubeChannelExtractor
+ink/harsh/pipe/shaded/org/schabi/newpipe/extractor/services/youtube/extractors/YoutubeChannelTabPlaylistExtractor
+innertube_context_client_version":"([0-9\.]+?)"
+INNERTUBE_CONTEXT_CLIENT_VERSION":"([0-9\.]+?)"
+innertubeCommand
+listItemViewModel.rendererContext.commandContext.onTap.innertubeCommand
+m.youtube.com
+M.YOUTUBE.COM
+Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)
+music.youtube.com
+MUSIC.YOUTUBE.COM
+rendererContext.commandContext.onTap.innertubeCommand.watchEndpoint.videoId
+SABR redirect escaped the GoogleVideo Host
+The given ID is not a YouTube channel or user ID
+The given string is not a YouTube video ID
+The URL given is not a YouTube URL
+the url given is not a YouTube-URL
+The URL is not a YouTube URL
+This video is a YouTube Music Premium video
+type.googleapis.com/niconicobulletcomments.BulletComment
+type.googleapis.com/niconicobulletcomments.BulletComment.MessageItem
+type.googleapis.com/niconicobulletcomments.BulletComment.MessageItem.Message
+type.googleapis.com/niconicobulletcomments.BulletComment.MessageItem.Message.Gift
+type.googleapis.com/niconicobulletcomments.BulletComment.MessageItem.Message.InnerMessage
+type.googleapis.com/niconicobulletcomments.BulletComment.MessageItem.Meta
+type.googleapis.com/niconicobulletcomments.BulletComment.MessageItem.Meta.AdditionalInfo
+type.googleapis.com/niconicobulletcomments.BulletComment.MessageItem.Meta.AdditionalInfo.InnerInfo
+type.googleapis.com/niconicobulletcomments.BulletComment.MessageItem.Meta.Timestamp
+type.googleapis.com/youtubesearchfilter.Extras
+type.googleapis.com/youtubesearchfilter.Filters
+type.googleapis.com/youtubesearchfilter.SearchRequest
+Unsupported YouTube channel tab sort filter: 
+vnd.youtube
+vnd.youtube.launch
+webcache.googleusercontent.com
+www.youtube-nocookie.com
+WWW.YOUTUBE-NOCOOKIE.COM
+www.youtube.com
+WWW.YOUTUBE.COM
+X-YouTube-Client-Name
+X-Youtube-Client-Version
+X-YouTube-Client-Version
+YouTube
+YouTube channel tab sort filter is not available
+YouTube Charts doesn't support this country for trending music videos charts
+YouTube extraction interrupted
+YouTube licence
+YouTube license
+YouTube Music
+YouTube next response is missing
+YouTube player response is missing
+YouTube probably temporarily blocked anonymous watch access with this IP , got error 
+YouTube requested CAPTCHA verification
+YouTube requests timed out
+YouTube streaming data is missing
+YouTube: 
+youtube.com
+YOUTUBE.COM
+youtubeFilters.proto

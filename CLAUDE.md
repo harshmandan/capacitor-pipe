@@ -26,6 +26,7 @@ submodules/PipePipeExtractor  pinned upstream, pristine
 submodules/NewPipeExtractor   pinned upstream, pristine
 tools/js/                     readable source for the WebView assets — EDIT HERE
 tools/shade/                  relocates NewPipeExtractor into a private namespace
+tools/strenc/                 encrypts identifying string literals in the jars (see ENCRYPTED-STRINGS.md)
 tools/force-java17.init.gradle  toolchain override for PipePipe (see Gotcha 1)
 scripts/                      build / update / verify
 ```
@@ -638,6 +639,37 @@ across with the ported Java sources. None of it renders: KDoc uses Markdown, so
 those tags show up literally in quick-docs and Dokka. Use blank lines, `**bold**`,
 fenced blocks and `[Symbol]` links. `@param` and `@return` are genuine KDoc tags
 and stay.
+
+### 27. String encryption depends on a javac flag that leaves no trace when it fails
+
+`tools/strenc` hides identifying string literals in the extractor jars, so a
+`strings`/grep over a release APK does not announce a YouTube extractor. It
+rewrites `ldc` and `ConstantValue` — the two forms a literal normally takes.
+
+The trap: since Java 9, `a + b` compiles to `invokedynamic
+makeConcatWithConstants`, and the literal parts move into the `BootstrapMethods`
+constant pool, which is **neither** form. `strenc` cannot see them, so
+`"https://www.youtube.com/…" + id` sails through in plaintext — and roughly half
+the identifying strings are concatenations. Nothing errors; the APK just still
+greps positive.
+
+`tools/force-java17.init.gradle` fixes it upstream of `strenc` with
+`-XDstringConcat=inline`, forcing pre-9 `StringBuilder` concat that emits `ldc`.
+Because it is a `-XD` internal flag, a JDK that drops it reverts concat to
+invokedynamic and the leak returns silently. `scripts/check-apk-obfuscation.sh`
+over the shipped APK is the only backstop — keep it wired into your APK checks.
+
+Two more things this cost, worth knowing before you touch it:
+
+- **It only covers the jars.** The plugin's own Kotlin ships as source and is
+  compiled by the consumer, so `strenc` never sees it; its YouTube strings
+  (attestation diagnostics, data-class `toString` names) remain. See
+  ENCRYPTED-STRINGS.md — that residue is a documented open decision, not a bug.
+- **The protobuf keep rule had to allow renaming.** `-keep` blocks obfuscation
+  as well as shrinking, so it was pinning `…services.youtube.protos.video.Xtags`
+  into the dex as a plaintext class name that no string encryption could reach.
+  It is now `-keep,allowobfuscation` + a `-keepclassmembers` for the fields
+  protobuf-lite actually reflects on.
 
 ---
 

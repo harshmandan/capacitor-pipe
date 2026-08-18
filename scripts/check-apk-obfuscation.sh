@@ -136,17 +136,32 @@ else
     done
 fi
 
+printf '\n\033[1mIdentifying string literals are encrypted\033[0m\n'
+
+# R8 never touches string literals, so these are hidden by tools/strenc, not R8.
+# Their return to plaintext means the encryption step was skipped, or javac
+# reverted to invokedynamic string concat (see ENCRYPTED-STRINGS.md) and the
+# literals moved into BootstrapMethods where strenc cannot reach them.
+want_absent 'api.pipepipe.dev' \
+    'the PipePipe decoder host is encrypted'
+want_absent 'youtubei/v1' \
+    'the InnerTube endpoint is encrypted'
+want_absent 'googlevideo.com' \
+    'the media host is encrypted'
+want_absent 'X-YouTube-Client' \
+    'YouTube client headers are encrypted'
+
 printf '\n\033[1mKNOWN-VISIBLE — asserted so a change is noticed, not because it is good\033[0m\n'
 
-# R8 renames symbols; it never touches string literals. These are in the dex in
-# plain text and no keep rule can change that. They are asserted PRESENT
-# deliberately: if one disappears, either an extractor stopped using it (worth
-# knowing) or string encryption landed (also worth knowing) -- and this file
-# should then be updated rather than the check deleted.
-want_present 'youtubei/v1' \
-    'InnerTube endpoint is plaintext (R8 never encrypts strings)'
+# Deliberately left plaintext: generic protocol vocabulary that names no host or
+# client. Encrypting these buys little (they are identical across every YouTube
+# client, yt-dlp included) and widens the transform's blast radius. Asserted
+# PRESENT so the day one moves -- encrypted, or dropped by an extractor -- this
+# file is updated rather than the check silently rotting. See ENCRYPTED-STRINGS.md.
 want_present 'adaptiveFormats' \
-    'InnerTube payload keys are plaintext'
+    'InnerTube payload keys remain plaintext (deliberately not encrypted)'
+want_present 'serverAbrStreamingUrl' \
+    'SABR streaming key remains plaintext (deliberately not encrypted)'
 
 printf '\n'
 if [ "$failures" -eq 0 ]; then

@@ -55,6 +55,38 @@ log "Relocating NewPipeExtractor out of org.schabi.newpipe"
 cp -f "$PPE_JAR" "$LIBS/pipepipe-extractor.jar"
 cp -f "$PPE_TIMEAGO_JAR" "$LIBS/pipepipe-timeago-parser.jar"
 
+log "Encrypting identifying string literals (see ENCRYPTED-STRINGS.md)"
+# Runs on the FINISHED, already-relocated jars. The shared Codec class is
+# injected into pipepipe-extractor.jar ONLY — all three jars reference the same
+# ink/harsh/pipe/strenc/Codec, so a second copy would be a duplicate-class error
+# at dex time and none would leave the reference unresolved. Relocation ran
+# earlier and does not touch ink.harsh.pipe.strenc, so the shaded NewPipe classes
+# resolve the same symbol.
+"$ROOT/android/gradlew" --no-daemon -p "$ROOT/tools/strenc" -q installDist
+STRENC="$ROOT/tools/strenc/build/install/pipe-strenc/bin/pipe-strenc"
+REPORT_DIR="$(mktemp -d)"
+
+encrypt_jar() {
+    jar="$1"; inject="$2"
+    tmp="$(mktemp -d)/$(basename "$jar")"
+    "$STRENC" "$LIBS/$jar" "$tmp" "$inject" "$REPORT_DIR/$jar.txt"
+    mv -f "$tmp" "$LIBS/$jar"
+}
+
+encrypt_jar pipepipe-extractor.jar        true    # hosts the shared Codec
+encrypt_jar newpipe-extractor-shaded.jar  false
+encrypt_jar pipepipe-timeago-parser.jar   false
+
+# The committed registry snapshot: the sorted union of every literal encrypted.
+# A diff here on an extractor bump is the signal that the identifying surface
+# changed — see ENCRYPTED-STRINGS.md.
+sort -u "$REPORT_DIR"/*.txt > "$ROOT/tools/strenc/encrypted-strings.txt"
+printf '    %s distinct strings encrypted across all jars\n' \
+    "$(wc -l < "$ROOT/tools/strenc/encrypted-strings.txt" | tr -d ' ')"
+
+log "Verifying encryption round-trips on a canary (build-time proof Codec decrypts)"
+"$ROOT/scripts/verify-strenc.sh" "$LIBS/pipepipe-extractor.jar"
+
 log "Verifying no class exceeds Java 17 bytecode (major 61)"
 "$ROOT/scripts/verify-bytecode.sh" "$LIBS"
 

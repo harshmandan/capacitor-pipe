@@ -1,0 +1,25 @@
+/*
+ * Standalone helper build that encrypts identifying string literals inside the
+ * already-built extractor jars, so a `strings`/grep over a shipped APK does not
+ * reveal that the app is a YouTube extractor.
+ *
+ * Runs AFTER the extractors are built and (for NewPipe) relocated — it operates
+ * on the finished jars in android/libs/, not on submodule source. See
+ * ENCRYPTED-STRINGS.md for scope, guarantees and the sizeable list of things
+ * this deliberately does NOT protect against.
+ */
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'pipe-strenc'

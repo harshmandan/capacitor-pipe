@@ -1,0 +1,32 @@
+plugins {
+    id 'application'
+}
+
+// NewPipe's own toolchain is 11 and the shade step runs on 17; match 17 here so
+// the rewritten classes are never accidentally upgraded past the D8 ceiling this
+// repo enforces (CLAUDE.md, Gotcha 1). ASM does not change class-file versions —
+// it preserves each class's own — so this only governs the tool itself.
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+dependencies {
+    // ASM is the only runtime dependency: read a class, rewrite its string
+    // constants, write it back. asm-tree is the node API used for ldc and
+    // ConstantValue rewriting.
+    implementation 'org.ow2.asm:asm:9.8'
+    implementation 'org.ow2.asm:asm-tree:9.8'
+
+    testImplementation 'junit:junit:4.13.2'
+}
+
+application {
+    mainClass = 'ink.harsh.pipe.strenc.StringEncryptor'
+}
+
+tasks.named('test') {
+    useJUnit()
+    testLogging { events 'passed', 'failed' }
+}

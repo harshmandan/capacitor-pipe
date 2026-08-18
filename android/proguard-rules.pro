@@ -79,7 +79,14 @@
 # Lite generated messages resolve their schema reflectively via dynamicMethod(),
 # so shrinking their members yields a runtime parse failure rather than a link
 # error.
--keep class * extends ink.harsh.pipe.shaded.com.google.protobuf.GeneratedMessageLite { *; }
+#
+# allowobfuscation is the point: protobuf-lite reflects on FIELDS, never on the
+# message class NAME (it reaches messages through `.class` references that R8
+# rewrites consistently). So the class may be renamed — and must be, or its
+# fully-qualified name leaks `...services.youtube.protos.video.Xtags` into the
+# dex in plain text, which no amount of string encryption elsewhere can hide.
+# The members keep below still protects the fields the schema needs.
+-keep,allowobfuscation class * extends ink.harsh.pipe.shaded.com.google.protobuf.GeneratedMessageLite
 -keepclassmembers class * extends ink.harsh.pipe.shaded.com.google.protobuf.GeneratedMessageLite {
     <fields>;
 }
