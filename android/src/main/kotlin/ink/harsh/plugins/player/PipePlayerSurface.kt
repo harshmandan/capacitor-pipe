@@ -206,6 +206,19 @@ internal fun PipePlayerSurface(
         var miniCorner by remember(miniConfig.corner) { mutableStateOf(miniConfig.corner) }
 
         /*
+         * Back to the configured corner every time the player is minimised.
+         *
+         * A dragged corner used to persist for the life of the app, so
+         * minimising again put the window wherever it was last dropped. System
+         * PiP does remember, but this is the host's layout rather than the
+         * system's: the corner is chosen to avoid the host's own bottom nav or
+         * app bar, and a window that quietly stops honouring that is worse than
+         * one that forgets a drag. The drag still holds for as long as the mini
+         * player is on screen.
+         */
+        LaunchedEffect(mini) { if (mini) miniCorner = miniConfig.corner }
+
+        /*
          * Animatable, so releasing SLIDES to the corner instead of jumping.
          *
          * It was a plain state zeroed on release, which teleported the window:

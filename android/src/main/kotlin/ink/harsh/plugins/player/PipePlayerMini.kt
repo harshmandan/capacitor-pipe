@@ -23,8 +23,17 @@ data class PipePlayerMiniConfig(
      * host to reconfigure anything.
      */
     val paddingLeft: Float = 14f,
-    val paddingTop: Float = 14f,
+    /**
+     * Larger than the sides on purpose.
+     *
+     * A top corner sits under the status bar and, in most hosts, under an app
+     * bar as well — 14dp put the window practically on top of both. This clears
+     * a standard 56dp toolbar; a host with taller chrome should raise it, which
+     * is exactly why these are props rather than constants.
+     */
+    val paddingTop: Float = 72f,
     val paddingRight: Float = 14f,
+    /** Clears a typical bottom nav; same reasoning as [paddingTop]. */
     val paddingBottom: Float = 42f,
     /**
      * Whether the user may drag it to another corner.
