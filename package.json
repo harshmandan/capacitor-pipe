@@ -57,7 +57,8 @@
     "docgen:player": "docgen --api PipePlayerPlugin --output-readme PLAYER.md --output-json dist/docs-player.json",
     "assets:build": "./scripts/build-assets.sh",
     "test:assets": "node scripts/test-assets.mjs",
-    "preinstall": "node ./scripts/only-bun.mjs"
+    "preinstall": "node ./scripts/only-bun.mjs",
+    "check:apk": "./scripts/check-apk-obfuscation.sh"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.0",
