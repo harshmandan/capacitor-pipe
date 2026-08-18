@@ -508,6 +508,17 @@ private class PersistentMintSession private constructor(
     }
 }
 
+/**
+ * Google's own public web-client key for the BotGuard attestation endpoint.
+ *
+ * Not a credential of ours: it is served inside youtube.com's HTML to every
+ * visitor, and the same literal appears in PipePipeClient's
+ * `LocalDomPoTokenProvider.kt`, in NewPipe and in yt-dlp. The endpoint accepts
+ * nothing else, so there is no key to rotate and none to keep out of the repo.
+ *
+ * Secret scanners flag it as `Google API Key`. That alert is a false positive —
+ * close it as such rather than trying to revoke a key we do not own.
+ */
 private const val LOCAL_DOM_GOOGLE_API_KEY =
     "AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw"
 
