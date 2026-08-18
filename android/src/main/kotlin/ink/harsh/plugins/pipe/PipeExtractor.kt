@@ -123,8 +123,12 @@ class PipeExtractor {
          * private video, so falling through on these buys nothing and doubles the
          * latency of a guaranteed failure. Matched by simple name because the two
          * engines' exception types live in different namespaces after relocation.
+         *
+         * `internal` because PipePipeEngine consults the same set before its
+         * second (mweb/SABR) pass — an age-gated video fails identically there
+         * too, so the retry would be a guaranteed-failure round trip.
          */
-        private val NOT_WORTH_RETRYING: Set<String> = setOf(
+        internal val NOT_WORTH_RETRYING: Set<String> = setOf(
             "AgeRestrictedContentException",
             "GeographicRestrictionException",
             "PrivateContentException",

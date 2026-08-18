@@ -45,6 +45,11 @@ before you render their output. See [DIVERGENCES.md](DIVERGENCES.md); the
 short version is that `dislikeCount`, `description` markup and SABR support all
 depend on which engine answered.
 
+Pass `sponsorBlock: true` to also fetch SponsorBlock segments
+(`streamInfo.sponsorBlockSegments`). Best-effort, and PipePipe-only — the
+NewPipe fallback has no SponsorBlock support, so results that fell through
+carry none.
+
 ## SABR
 
 Some videos are delivered only over SABR, YouTube's session-based protocol.
@@ -361,13 +366,11 @@ One engine's attempt at an extraction, successful or not.
 
 #### AudioStream
 
-| Prop                  | Type                 | Description                                     |
-| --------------------- | -------------------- | ----------------------------------------------- |
-| **`bitrate`**         | <code>number</code>  | Average bitrate in bits per second.             |
-| **`audioTrackId`**    | <code>string</code>  | Track id for multi-language audio, e.g. `en.4`. |
-| **`audioTrackName`**  | <code>string</code>  |                                                 |
-| **`isOriginalAudio`** | <code>boolean</code> | True for the video's original-language audio.   |
-| **`isDrc`**           | <code>boolean</code> | True for dynamic-range-compressed tracks.       |
+| Prop                 | Type                | Description                                     |
+| -------------------- | ------------------- | ----------------------------------------------- |
+| **`bitrate`**        | <code>number</code> | Average bitrate in bits per second.             |
+| **`audioTrackId`**   | <code>string</code> | Track id for multi-language audio, e.g. `en.4`. |
+| **`audioTrackName`** | <code>string</code> |                                                 |
 
 
 #### SubtitleStream
@@ -395,7 +398,6 @@ One engine's attempt at an extraction, successful or not.
 | --------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | **`videoUrl`**        | <code>string</code> |                                                                                                                                  |
 | **`startPositionMs`** | <code>number</code> | Start position in milliseconds. The session preloads around this point, so setting it avoids a wasted seek on resume. Default 0. |
-| **`audioTrackId`**    | <code>string</code> | Preferred audio track id for multi-language videos.                                                                              |
 
 
 #### SabrSessionResult
@@ -449,7 +451,6 @@ Availability of each engine and of the optional native playback path.
 | **`pipePipeVersion`** | <code>string</code>  |                                                                            |
 | **`newPipeVersion`**  | <code>string</code>  |                                                                            |
 | **`media3Available`** | <code>boolean</code> | True when androidx.media3 was found, enabling the native MediaSource path. |
-| **`loopbackPort`**    | <code>number</code>  | Port the loopback SABR server is bound to, once a session has been opened. |
 
 
 ### Type Aliases

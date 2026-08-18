@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -40,7 +41,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class PipeSabrServer(private val manager: PipeSabrManager) {
 
-    private val workers: ExecutorService = Executors.newCachedThreadPool()
+    /**
+     * Created per [start], not per server. The manager stops the server when
+     * the last session closes and restarts it on the next open; an executor
+     * created once and `shutdownNow()`-ed on stop rejects every task after a
+     * restart, and the RejectedExecutionException escaped the accept thread —
+     * killing the process on the second SABR session.
+     */
+    private var workers: ExecutorService? = null
     private val running = AtomicBoolean(false)
 
     private var serverSocket: ServerSocket? = null
@@ -56,11 +64,13 @@ class PipeSabrServer(private val manager: PipeSabrManager) {
         }
         // Port 0: let the OS choose, so two apps on one device cannot collide.
         val socket = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
+        val pool = Executors.newCachedThreadPool()
         serverSocket = socket
+        workers = pool
         port = socket.localPort
         running.set(true)
 
-        val thread = Thread({ acceptLoop() }, "PipeSabrServer")
+        val thread = Thread({ acceptLoop(socket, pool) }, "PipeSabrServer")
         acceptThread = thread
         thread.isDaemon = true
         thread.start()
@@ -79,7 +89,8 @@ class PipeSabrServer(private val manager: PipeSabrManager) {
         } catch (ignored: IOException) {
             // Closing the socket is what unblocks accept(); failure here is moot.
         }
-        workers.shutdownNow()
+        workers?.shutdownNow()
+        workers = null
         acceptThread?.interrupt()
         port = -1
     }
@@ -91,11 +102,23 @@ class PipeSabrServer(private val manager: PipeSabrManager) {
     fun manifestUrl(sessionId: String): String =
         "http://127.0.0.1:" + port + "/" + sessionId + "/manifest.mpd"
 
-    private fun acceptLoop() {
+    private fun acceptLoop(socket: ServerSocket, pool: ExecutorService) {
         while (running.get()) {
             try {
-                val socket = serverSocket!!.accept()
-                workers.execute { handleQuietly(socket) }
+                val client = socket.accept()
+                try {
+                    pool.execute { handleQuietly(client) }
+                } catch (e: RejectedExecutionException) {
+                    // stop() raced this accept and shut the pool down; treat it
+                    // like the socket closing rather than letting it escape and
+                    // take the process down with an uncaught exception.
+                    try {
+                        client.close()
+                    } catch (ignored: IOException) {
+                        // Nothing to salvage.
+                    }
+                    return
+                }
             } catch (e: IOException) {
                 if (running.get()) {
                     Log.w(TAG, "accept failed", e)
@@ -216,6 +239,35 @@ class PipeSabrServer(private val manager: PipeSabrManager) {
             sequenceNumber = sequence.toInt()
         } catch (e: NumberFormatException) {
             respondError(out, 400, "Bad sequence $sequence")
+            return
+        }
+        // Media sequences are 1-based; 0 and negatives would otherwise build a
+        // key that collides with the INIT sentinel and spin out the full
+        // await budget before failing.
+        if (sequenceNumber <= 0) {
+            respondError(out, 400, "Bad sequence $sequence")
+            return
+        }
+        // Upstream fails a beyond-timeline request instantly
+        // (SabrSegmentDataSource). Without this, a player probing past the end
+        // held the transaction lock for the whole no-progress budget, starving
+        // every other segment request, before surfacing a generic 503.
+        val endSequence = try {
+            session.bridge.getTimeline(format).endSequence
+        } catch (e: IllegalStateException) {
+            Int.MAX_VALUE // Timeline not parsed yet; let awaitSegment drive it.
+        }
+        if (sequenceNumber > endSequence) {
+            respondError(out, 404, "Sequence $sequenceNumber beyond timeline end $endSequence")
+            return
+        }
+
+        // A HEAD is a reachability probe, not a demand for bytes. Driving the
+        // full SABR fetch just to discard the segment paid a whole round per
+        // probe; answer from what we already know instead. Content-Length is
+        // deliberately omitted — it is unknowable without fetching.
+        if (!bodyWanted) {
+            respondHeadOnly(out)
             return
         }
 
@@ -343,6 +395,19 @@ class PipeSabrServer(private val manager: PipeSabrManager) {
     }
 
     @Throws(IOException::class)
+    private fun respondHeadOnly(out: BufferedOutputStream) {
+        val head = "HTTP/1.1 200 OK\r\n" +
+            "Content-Type: application/octet-stream\r\n" +
+            "Accept-Ranges: bytes\r\n" +
+            "Access-Control-Allow-Origin: *\r\n" +
+            "Access-Control-Allow-Headers: Range\r\n" +
+            "Cache-Control: no-store\r\n" +
+            "Connection: close\r\n\r\n"
+        out.write(head.toByteArray(StandardCharsets.US_ASCII))
+        out.flush()
+    }
+
+    @Throws(IOException::class)
     private fun respondError(out: BufferedOutputStream, status: Int, message: String) {
         val body = message.toByteArray(StandardCharsets.UTF_8)
         val head = String.format(
@@ -365,7 +430,10 @@ class PipeSabrServer(private val manager: PipeSabrManager) {
         /** @return {start, end, isPartial} */
         private fun parseRange(rangeHeader: String?, length: Long): LongArray {
             if (rangeHeader == null || !rangeHeader.startsWith("bytes=") || length <= 0) {
-                return longArrayOf(0, Math.max(0L, length - 1), 0)
+                // end is length-1 even when that is -1: an empty body must
+                // yield count 0, not the count-1 that Math.max(0, ...) produced
+                // (which made respondBytes write one byte of a zero-byte array).
+                return longArrayOf(0, length - 1, 0)
             }
             val spec = rangeHeader.substring("bytes=".length).trim()
             // Only the first range of a multi-range request is honoured; players

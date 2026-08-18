@@ -45,7 +45,13 @@ class SabrSegmentKey private constructor(
             SabrSegmentKey(format, INIT)
 
         @JvmStatic
-        fun media(format: YoutubeSabrInfo.Format, sequenceNumber: Int): SabrSegmentKey =
-            SabrSegmentKey(format, sequenceNumber)
+        fun media(format: YoutubeSabrInfo.Format, sequenceNumber: Int): SabrSegmentKey {
+            // Media sequences are 1-based (the manifest's startNumber is 1).
+            // Upstream throws here too; without the guard a -1 built a media
+            // key indistinguishable from the INIT sentinel, which could never
+            // be served and spun the await budget out instead of failing fast.
+            require(sequenceNumber > 0) { "Media sequence must be positive: $sequenceNumber" }
+            return SabrSegmentKey(format, sequenceNumber)
+        }
     }
 }

@@ -24,6 +24,15 @@ class PipeSabrManager(context: Context, private val engine: PipePipeEngine) {
     private val server: PipeSabrServer = PipeSabrServer(this)
     private val sessions: MutableMap<String, PipeSabrSession> = ConcurrentHashMap()
 
+    /**
+     * Makes "start the server and register the session" atomic against "remove
+     * the last session and stop the server". Without it, a close() racing an
+     * open() could observe an empty registry after the server had started for
+     * the new session and stop it underneath — leaving a manifestUrl that
+     * points at a closed socket.
+     */
+    private val serverLock = Any()
+
     fun get(sessionId: String): PipeSabrSession? = sessions[sessionId]
 
     fun getPort(): Int = server.getPort()
@@ -54,13 +63,16 @@ class PipeSabrManager(context: Context, private val engine: PipePipeEngine) {
         val bridge = PipeSabrBridge(session, spec, extraction.info.videoId)
 
         try {
+            // A server-requested backoff outlives the session that received it;
+            // starting a fresh session's first round inside the window is
+            // exactly what the server asked us not to do.
+            PipeSabrBackoff.awaitClear()
+
             // Must precede manifest generation: segment counts and durations
             // come from the index inside the init segments this fetches.
             bridge.prepareTimelines(Math.max(0L, startPositionMs))
 
             val manifest = PipeSabrManifest.build(spec, bridge, extraction.durationMs)
-
-            server.start()
 
             val opened = PipeSabrSession(
                 sessionId,
@@ -72,8 +84,11 @@ class PipeSabrManager(context: Context, private val engine: PipePipeEngine) {
                 spool,
                 extraction.durationMs,
             )
-            sessions[sessionId] = opened
-            ALL_SESSIONS[sessionId] = opened
+            synchronized(serverLock) {
+                server.start()
+                sessions[sessionId] = opened
+                ALL_SESSIONS[sessionId] = opened
+            }
 
             Log.i(
                 TAG,
@@ -94,30 +109,36 @@ class PipeSabrManager(context: Context, private val engine: PipePipeEngine) {
     fun manifestUrl(sessionId: String): String = server.manifestUrl(sessionId)
 
     fun close(sessionId: String): Boolean {
-        val session = sessions.remove(sessionId)
-        ALL_SESSIONS.remove(sessionId)
+        val session: PipeSabrSession?
+        synchronized(serverLock) {
+            session = sessions.remove(sessionId)
+            ALL_SESSIONS.remove(sessionId)
+            // The server exists only to serve sessions; idle it when the last
+            // one goes so we are not holding a listening socket for nothing.
+            // Decided under the lock so an in-flight open() cannot lose its
+            // just-started server.
+            if (session != null && sessions.isEmpty()) {
+                server.stop()
+            }
+        }
         if (session == null) {
             return false
         }
         session.close()
         Log.i(TAG, "SABR session " + sessionId + " closed")
-
-        // The server exists only to serve sessions; idle it when the last one
-        // goes so we are not holding a listening socket for nothing.
-        if (sessions.isEmpty()) {
-            server.stop()
-        }
         return true
     }
 
     /** Close every session. Call from the plugin's destroy hook. */
     fun closeAll() {
-        for (id in sessions.keys) {
-            val session = sessions.remove(id)
-            ALL_SESSIONS.remove(id)
-            session?.close()
+        synchronized(serverLock) {
+            for (id in sessions.keys.toList()) {
+                val session = sessions.remove(id)
+                ALL_SESSIONS.remove(id)
+                session?.close()
+            }
+            server.stop()
         }
-        server.stop()
     }
 
     companion object {

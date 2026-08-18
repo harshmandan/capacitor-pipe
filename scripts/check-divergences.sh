@@ -80,6 +80,16 @@ assert_grep 3 yes "$PP/downloader/Response.java" \
     'rawResponseBody' "PipePipe Response still carries a raw byte[] (SABR needs it)"
 assert_grep 3 no  "$NP/downloader/Response.java" \
     'rawResponseBody' "NewPipe Response still has no raw body"
+assert_grep 2 yes "$PP/downloader/Downloader.java" \
+    'public StreamingResponse getStreaming' "PipePipe still declares getStreaming (we override it to stream)"
+assert_grep 2 yes "$PP/downloader/Downloader.java" \
+    'public StreamingResponse postStreaming' "PipePipe still declares postStreaming (we override it to stream)"
+assert_grep 2 yes "$PP/downloader/Downloader.java" \
+    'final long timeoutMs' "PipePipe getStreaming still carries timeoutMs (we honour it per-call)"
+assert_grep 2 no  "$NP/downloader/Downloader.java" \
+    'StreamingResponse' "NewPipe still has no streaming methods"
+assert_grep 2 yes "$SRC/net/PipePipeDownloader.kt" \
+    'override fun getStreaming' "our downloader still overrides getStreaming (defaults buffer whole SABR rounds)"
 assert_grep 4 yes "$PP/downloader/Request.java" \
     'public boolean followRedirects\(\)' "PipePipe Request still exposes followRedirects()"
 assert_grep 4 no  "$NP/downloader/Request.java" \
@@ -108,12 +118,25 @@ assert_grep 7 yes "$PP/sponsorblock/SponsorBlockSegment.java" \
     'public (String uuid|double startTime)' "SponsorBlockSegment still uses public fields, not getters"
 assert_grep 7 no  "$NP/stream/StreamInfo.java" \
     'getSponsorBlockSegments' "NewPipe still has no SponsorBlock"
+assert_grep 7 yes "$PP/StreamingService.java" \
+    'setSponsorBlockApiSettings' "PipePipe StreamingService still takes SponsorBlock settings"
+assert_grep 7 yes "$PP/stream/StreamInfo.java" \
+    'getSponsorBlockApiSettings' "StreamInfo still gates the fetch on installed settings"
+assert_grep 7 yes "$PP/sponsorblock/SponsorBlockApiSettings.java" \
+    'public String apiUrl' "SponsorBlockApiSettings still uses a public apiUrl field"
+assert_grep 7 yes "$SRC/engine/PipePipeEngine.kt" \
+    'setSponsorBlockApiSettings' "our engine still installs/clears the settings per call"
 
 head2 "8. SABR"
 assert_grep 8 yes "$PP/stream/DeliveryMethod.java" \
     '^\s+SABR' "PipePipe still has DeliveryMethod.SABR"
 assert_grep 8 no  "$NP/stream/DeliveryMethod.java" \
     '^\s+SABR' "NewPipe still has NO SABR (fallback cannot rescue SABR-only videos)"
+# 8a: SabrSegmentKey and the spec's maps key Formats by IDENTITY, which is only
+# true while upstream's Format declares no equals/hashCode of its own.
+assert_grep 8 no "$PP/services/youtube/sabr/YoutubeSabrInfo.java" \
+    'public boolean equals\(|public int hashCode\(' \
+    "YoutubeSabrInfo.Format still has identity equality (our maps depend on it)"
 checks=$((checks + 1))
 NP_SABR_FILES="$(grep -ril sabr "$NP" 2>/dev/null | wc -l | tr -d ' ')"
 if [ "$NP_SABR_FILES" -le 2 ]; then

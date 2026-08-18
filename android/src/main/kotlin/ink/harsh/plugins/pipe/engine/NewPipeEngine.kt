@@ -14,6 +14,7 @@ import ink.harsh.pipe.shaded.org.schabi.newpipe.extractor.stream.StreamType
 import ink.harsh.pipe.shaded.org.schabi.newpipe.extractor.stream.SubtitlesStream
 import ink.harsh.pipe.shaded.org.schabi.newpipe.extractor.stream.VideoStream
 import ink.harsh.plugins.pipe.net.NewPipeDownloader
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 /**
  * Fallback engine: NewPipeExtractor, relocated to
@@ -33,6 +34,16 @@ class NewPipeEngine : ExtractionEngine {
     @Volatile
     private var initialized = false
 
+    /**
+     * Guards this fork's global localization state; see the identical
+     * arrangement in PipePipeEngine. The two engines have independent statics
+     * (that is the point of the relocation), so each carries its own lock.
+     */
+    private val localizationLock = ReentrantReadWriteLock()
+
+    @Volatile
+    private var appliedLocale: String? = null
+
     override fun id(): String = ID
 
     override fun isAvailable(): Boolean = try {
@@ -44,8 +55,41 @@ class NewPipeEngine : ExtractionEngine {
 
     override fun version(): String = "NewPipeExtractor"
 
-    @Synchronized
-    private fun ensureInitialized(request: ExtractionRequest) {
+    private fun localeKey(request: ExtractionRequest): String =
+        (request.localization ?: "") + "|" + (request.contentCountry ?: "")
+
+    /**
+     * Run `block` with the request's locale applied and held stable — the
+     * matching-locale fast path stays concurrent on the read lock; a locale
+     * change holds the write lock for its whole extraction.
+     */
+    private fun <T> withLocalization(request: ExtractionRequest, block: () -> T): T {
+        val key = localeKey(request)
+        val read = localizationLock.readLock()
+        read.lock()
+        if (initialized && key == appliedLocale) {
+            try {
+                return block()
+            } finally {
+                read.unlock()
+            }
+        }
+        read.unlock()
+
+        val write = localizationLock.writeLock()
+        write.lock()
+        try {
+            if (!initialized || key != appliedLocale) {
+                applyLocalization(request)
+                appliedLocale = key
+            }
+            return block()
+        } finally {
+            write.unlock()
+        }
+    }
+
+    private fun applyLocalization(request: ExtractionRequest) {
         // This fork returns Optional here; PipePipe's returns the Localization
         // directly. Same method name, different signature — one of several
         // reasons the two engines cannot share mapping code.
@@ -75,10 +119,10 @@ class NewPipeEngine : ExtractionEngine {
     }
 
     @Throws(Exception::class)
-    override fun extractStreamInfo(request: ExtractionRequest): JSObject {
-        ensureInitialized(request)
-        return map(StreamInfo.getInfo(ServiceList.YouTube, request.videoUrl))
-    }
+    override fun extractStreamInfo(request: ExtractionRequest): JSObject =
+        withLocalization(request) {
+            map(StreamInfo.getInfo(ServiceList.YouTube, request.videoUrl))
+        }
 
     companion object {
 

@@ -49,13 +49,12 @@ export interface BaseStream {
   /** False when `content` holds an inline manifest rather than a URL. */
   isUrl: boolean;
   deliveryMethod: DeliveryMethod;
-  /** Container/codec name, e.g. `MPEG_4`, `WEBMA_OPUS`. */
-  format: string;
+  /** Container/codec name, e.g. `MPEG_4`, `WEBMA_OPUS`. Absent when the extractor cannot name it. */
+  format?: string;
   mimeType?: string;
   /** YouTube format id. */
   itag?: number;
   codec?: string;
-  contentLength?: number;
   /** Byte range of the initialisation segment, for DASH assembly. */
   initStart?: number;
   initEnd?: number;
@@ -79,10 +78,6 @@ export interface AudioStream extends BaseStream {
   /** Track id for multi-language audio, e.g. `en.4`. */
   audioTrackId?: string;
   audioTrackName?: string;
-  /** True for the video's original-language audio. */
-  isOriginalAudio?: boolean;
-  /** True for dynamic-range-compressed tracks. */
-  isDrc?: boolean;
 }
 
 export interface SubtitleStream extends BaseStream {
@@ -208,8 +203,6 @@ export interface OpenSabrSessionOptions {
    * so setting it avoids a wasted seek on resume. Default 0.
    */
   startPositionMs?: number;
-  /** Preferred audio track id for multi-language videos. */
-  audioTrackId?: string;
 }
 
 export interface SabrSessionResult {
@@ -264,8 +257,6 @@ export interface EngineStatus {
   newPipeVersion?: string;
   /** True when androidx.media3 was found, enabling the native MediaSource path. */
   media3Available: boolean;
-  /** Port the loopback SABR server is bound to, once a session has been opened. */
-  loopbackPort?: number;
 }
 
 export interface PipePlugin {

@@ -3,11 +3,27 @@
  *   https://codeberg.org/NullPointerException/PipePipeClient
  *   app/src/main/java/org/schabi/newpipe/player/datasource/SabrMediaBridge.java
  * Copyright (C) the PipePipe authors. Licensed under GPL-3.0-or-later.
- * Converted from Java to Kotlin; behaviour unchanged.
+ * Converted from Java to Kotlin.
  *
- * Modifications: transport removed so both the Media3 and loopback-HTTP
- * adapters can share one instance, and awaitSegment waits for an in-flight
- * transaction instead of throwing a pending exception for ExoPlayer to retry.
+ * Modifications:
+ *  - Transport removed so both the Media3 and loopback-HTTP adapters can
+ *    share one instance.
+ *  - awaitSegment waits for an in-flight transaction instead of throwing a
+ *    pending exception for ExoPlayer to retry.
+ *  - Upstream's setSelection (fed from ExoPlayer's live track selection) is
+ *    replaced by tracking the last format each transport actually requested a
+ *    media segment for, falling back to the bootstrap formats before any
+ *    request has named that track. Without a custom MediaSource there is no
+ *    selection callback to receive.
+ *  - acceptInitialization logs and skips a bad init segment instead of
+ *    throwing upstream's IllegalStateException, so one bad track cannot take
+ *    the whole session down.
+ *  - Server-requested backoff is published to the process-wide PipeSabrBackoff
+ *    instead of upstream's persisted SabrBackoffCoordinator.
+ *  - Upstream's seedSegments has no equivalent because it is unnecessary here:
+ *    its probe runs before the bridge exists, so probe-time media must be
+ *    carried across in the spec; our preparation round runs on this bridge and
+ *    its consumer already caches media via cacheMedia.
  */
 package ink.harsh.plugins.pipe.sabr
 
@@ -65,6 +81,22 @@ class PipeSabrBridge(
     private var stopped = false
 
     /**
+     * The format each track was most recently asked for, standing in for
+     * upstream's ExoPlayer-fed Selection.
+     *
+     * The counterpart named in every request must be the format the player is
+     * *actually consuming*: naming the bootstrap format after an ABR switch or
+     * an audio-language pick tells the server to keep advancing a track nobody
+     * wants — wrong-language segments fill the ahead cache and evict the ones
+     * the player needs, and the buffered-through claims stop being honest.
+     */
+    @Volatile
+    private var lastRequestedAudio: YoutubeSabrInfo.Format? = null
+
+    @Volatile
+    private var lastRequestedVideo: YoutubeSabrInfo.Format? = null
+
+    /**
      * Drives each request to completion.
      *
      * Never call [YoutubeSabrSession.requestOnce] directly: a single
@@ -76,7 +108,9 @@ class PipeSabrBridge(
     private val coordinator: PipeSabrRequestCoordinator = PipeSabrRequestCoordinator(
         session,
         PipeSabrAttestationRetry(videoId),
-        LongConsumer { },
+        // Published process-wide so a session opened during a server-requested
+        // backoff waits it out instead of immediately re-requesting.
+        LongConsumer { backoffMs -> PipeSabrBackoff.publish(backoffMs) },
     )
 
     fun hasTimelines(): Boolean = audioTimeline != null && videoTimeline != null
@@ -126,9 +160,14 @@ class PipeSabrBridge(
                     acceptSegment(segment, audio)
                 },
                 BooleanSupplier {
-                    hasTimelines() || stopped ||
-                        // A single-track video legitimately never produces both.
-                        audio == null || video == null
+                    // Per-track readiness, not `audio == null || video == null`:
+                    // that was true for single-track content before any segment
+                    // arrived, so a legitimate policy-only or backoff first
+                    // round (Gotcha 11) ended the loop with no timeline at all
+                    // where a second round would have succeeded.
+                    stopped ||
+                        ((audio == null || audioTimeline != null) &&
+                            (video == null || videoTimeline != null))
                 },
             )
         } finally {
@@ -154,6 +193,13 @@ class PipeSabrBridge(
     fun awaitSegment(key: SabrSegmentKey): SabrMediaSegment {
         if (!key.isInitialization()) {
             nextSequences[key.format] = key.sequenceNumber
+            // A media request is the transport telling us what the player is
+            // consuming — the closest thing we have to upstream's setSelection.
+            if (key.format.isAudio) {
+                lastRequestedAudio = key.format
+            } else {
+                lastRequestedVideo = key.format
+            }
         }
 
         val deadline = System.currentTimeMillis() + AWAIT_TIMEOUT_MS
@@ -208,8 +254,15 @@ class PipeSabrBridge(
         tracks.add(trackFor(requested))
 
         // Keep the other track in the request so the server keeps both in step;
-        // a request naming only one track makes the server drop the other.
-        val counterpart = if (requested.isAudio) spec.bootstrapVideo() else spec.bootstrapAudio()
+        // a request naming only one track makes the server drop the other. The
+        // counterpart is the format that track last actually played — see
+        // lastRequestedAudio/Video — with bootstrap only as the pre-request
+        // fallback, mirroring upstream's live Selection.
+        val counterpart = if (requested.isAudio) {
+            lastRequestedVideo ?: spec.bootstrapVideo()
+        } else {
+            lastRequestedAudio ?: spec.bootstrapAudio()
+        }
         if (counterpart != null && counterpart != requested) {
             tracks.add(trackFor(counterpart))
         }

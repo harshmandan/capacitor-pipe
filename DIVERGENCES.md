@@ -76,8 +76,23 @@ Why PipePipe needs it: its YouTube extractor fans several InnerTube client
 requests out in parallel and drops the losers, so cancellation is normal control
 flow, not an error. Our `onFailure` suppresses errors for cancelled calls.
 
+**Streaming methods (PipePipe only).** PipePipe's `Downloader` also declares
+`getStreaming` (two overloads, one carrying a per-call `timeoutMs`) and
+`postStreaming`, returning `StreamingResponse` — the path every SABR round goes
+through. The base-class defaults buffer the whole response into one `byte[]`
+and *discard* `timeoutMs`; a SABR media round can carry tens of megabytes, so
+`PipePipeDownloader` overrides all three to stream okhttp's `byteStream()` and
+honour the deadline with a bounded per-call client (`HttpCore.newStreamingCall`),
+mirroring PipePipeClient's `DownloaderImpl`. NewPipe has no streaming methods at
+all.
+
+- `net/PipePipeDownloader.kt` — `getStreaming` ×2, `postStreaming`
+- `net/HttpCore.kt` — `newStreamingCall`
+
 **On upgrade (PipePipe):** if `CancellableCall` stops wrapping `okhttp3.Call`, or
-`AsyncCallback` gains methods, `PipePipeDownloader` breaks. Also re-check the
+`AsyncCallback` gains methods, `PipePipeDownloader` breaks. If the streaming
+method signatures change, the overrides above stop overriding — Kotlin's
+`override` makes that a compile error. Also re-check the
 okhttp version pin in `android/build.gradle` — it must match what the extractor
 was compiled against.
 
@@ -203,11 +218,23 @@ PipePipe only.
 Fields are public (`segment.uuid`, `.startTime`, `.endTime`), not getters, and
 times are fractional milliseconds that we cast to `long`.
 
+**Precondition: the fetch is opt-in via service settings.** `StreamInfo.getInfo`
+only requests segments while
+`StreamingService.setSponsorBlockApiSettings(...)` holds non-null settings —
+with none installed, `getSponsorBlockSegments()` is silently empty for every
+video. `PipePipeEngine.extractLocked` installs a fixed
+`SponsorBlockApiSettings` (public API `https://sponsor.ajay.app/api/`, all
+categories) for the duration of an opted-in extraction and always clears it in
+a `finally`, under the same `CLIENT_LOCK` as the player client — it is the same
+kind of global service state. NewPipe's `StreamingService` has no such setter.
+
 **Consequence for callers:** `sponsorBlockSegments` is absent when the fallback
 served the result. Read `result.engine` before assuming it is missing because the
 video has no segments.
 
-**On upgrade (PipePipe):** if the public fields become getters, this breaks.
+**On upgrade (PipePipe):** if the public fields become getters, this breaks. If
+`setSponsorBlockApiSettings` moves or `SponsorBlockApiSettings`' fields change,
+the install in `PipePipeEngine` breaks — the checker asserts both.
 
 ---
 
@@ -252,6 +279,23 @@ outages of that service. Do not expect it to cover SABR.
 **On upgrade (NewPipe):** if upstream implements SABR, revisit this whole file —
 the engines would become genuinely equivalent and `requiresSabr: false` would
 become a lie.
+
+### 8a. `YoutubeSabrInfo.Format` identity equality (upstream-shape assumption)
+
+`SabrSegmentKey.equals` compares formats with `==`, and `PipeSabrSpec` /
+`PipeSabrBridge` key maps by `Format` directly. That is *identity* semantics
+only because PipePipe's `YoutubeSabrInfo.Format` declares no
+`equals`/`hashCode` override — which is what makes two Format objects for the
+same itag distinct, the property multi-language audio depends on (one itag,
+several tracks). Internally consistent today because a single `PipeSabrSpec`
+instance supplies every Format a session touches.
+
+- `sabr/SabrSegmentKey.kt` — `format == other.format`, documented as identity
+- `sabr/PipeSabrSpec.kt`, `sabr/PipeSabrBridge.kt` — Format-keyed maps
+
+**On upgrade (PipePipe):** if `Format` gains `equals`/`hashCode`, the comment's
+identity claim silently stops being true and same-itag tracks could collide in
+the maps. The checker asserts the absence of an override.
 
 ---
 

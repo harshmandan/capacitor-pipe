@@ -7,6 +7,7 @@ import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import ink.harsh.plugins.pipe.engine.ExtractionRequest
+import ink.harsh.plugins.pipe.engine.NewPipeEngine
 import ink.harsh.plugins.pipe.engine.PipePipeEngine
 import ink.harsh.plugins.pipe.sabr.PipeSabrManager
 import ink.harsh.plugins.pipe.sabr.PipeSabrPoTokens
@@ -80,9 +81,9 @@ open class PipePlugin : Plugin() {
 
         for (engine in extractor.availableEngines()) {
             available.put(engine.id())
-            if ("pipepipe" == engine.id()) {
+            if (PipePipeEngine.ID == engine.id()) {
                 result.put("pipePipeVersion", engine.version())
-            } else if ("newpipe" == engine.id()) {
+            } else if (NewPipeEngine.ID == engine.id()) {
                 result.put("newPipeVersion", engine.version())
             }
         }
@@ -171,13 +172,9 @@ open class PipePlugin : Plugin() {
             call.reject("sessionId is required")
             return
         }
-        val manager = sabrManager
-        if (manager == null || !manager.close(sessionId)) {
-            // Idempotent: closing an already-closed session is not an error, or
-            // callers would have to track state we already track.
-            call.resolve()
-            return
-        }
+        // Idempotent: closing an already-closed session is not an error, or
+        // callers would have to track state we already track.
+        sabrManager?.close(sessionId)
         call.resolve()
     }
 

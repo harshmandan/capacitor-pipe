@@ -133,7 +133,9 @@ object HttpCore {
         if (dataToSend != null && (headers == null || !hasHeader(headers, "Content-Type"))) {
             builder.header("Content-Type", JSON_CONTENT_TYPE)
         }
-        if (url.contains("youtube.com") && (headers == null || !headers.containsKey("Cookie"))) {
+        // Case-insensitive, like the User-Agent and Content-Type checks above:
+        // a caller sending "cookie:" must not get our default stacked on top.
+        if (url.contains("youtube.com") && (headers == null || !hasHeader(headers, "Cookie"))) {
             builder.header("Cookie", YOUTUBE_COOKIE)
         }
 
@@ -144,6 +146,48 @@ object HttpCore {
         }
 
         return callClient.newCall(builder.build())
+    }
+
+    /**
+     * A call whose response body is meant to be *streamed*, with an optional
+     * per-call deadline.
+     *
+     * SABR rounds can carry tens of megabytes of media; the extractor's
+     * `getStreaming`/`postStreaming` contract exists so they are not buffered
+     * whole. `timeoutMs <= 0` means "the shared client's defaults".
+     */
+    @JvmStatic
+    fun newStreamingCall(
+        httpMethod: String,
+        url: String,
+        headers: Map<String, List<String?>?>?,
+        dataToSend: ByteArray?,
+        followRedirects: Boolean,
+        timeoutMs: Long,
+    ): Call {
+        var callClient = if (followRedirects) {
+            client()
+        } else {
+            client().newBuilder().followRedirects(false).followSslRedirects(false).build()
+        }
+        if (timeoutMs > 0) {
+            // Bounded per-call client, mirroring PipePipeClient's DownloaderImpl:
+            // the session decides how long a round may take, and the extractor's
+            // default of silently dropping timeoutMs left a stalled round
+            // hanging on our 30s globals instead.
+            val bounded = Math.max(1L, timeoutMs)
+            callClient = callClient.newBuilder()
+                .callTimeout(bounded, TimeUnit.MILLISECONDS)
+                .connectTimeout(bounded, TimeUnit.MILLISECONDS)
+                .readTimeout(bounded, TimeUnit.MILLISECONDS)
+                .build()
+        }
+
+        // Re-use newCall's request building (headers, UA/Content-Type/Cookie
+        // defaults, null-MediaType body) by building the request there and
+        // re-issuing it on the bounded client.
+        val request = newCall(httpMethod, url, headers, dataToSend, followRedirects).request()
+        return callClient.newCall(request)
     }
 
     private fun hasHeader(headers: Map<String, List<String?>?>, name: String): Boolean {

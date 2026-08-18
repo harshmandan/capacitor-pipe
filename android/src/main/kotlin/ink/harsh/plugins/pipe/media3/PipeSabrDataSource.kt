@@ -76,6 +76,21 @@ class PipeSabrDataSource internal constructor(
             available = Math.max(0L, (total - position).toLong())
         } else {
             val bridge = session.bridge
+            // Upstream (SabrSegmentDataSource) fails a beyond-timeline request
+            // instantly. Without this, a seek past the last segment blocked in
+            // awaitSegment for the whole no-progress budget while holding the
+            // transaction lock, starving every concurrent segment request.
+            val endSequence = try {
+                bridge.getTimeline(key.format).endSequence
+            } catch (e: IllegalStateException) {
+                Int.MAX_VALUE // Timeline not parsed yet; let the session drive it.
+            }
+            if (key.sequenceNumber > endSequence) {
+                throw IOException(
+                    "SABR sequence ${key.sequenceNumber} beyond timeline end " +
+                        "$endSequence for itag=${key.format.itag}",
+                )
+            }
             var segment = awaitSegment(bridge, key)
             try {
                 stream = segment.openStream()
@@ -197,7 +212,13 @@ class PipeSabrDataSource internal constructor(
                 return SabrSegmentKey.initialization(format)
             }
             try {
-                return SabrSegmentKey.media(format, sequence.toInt())
+                val sequenceNumber = sequence.toInt()
+                // Fail as IOException rather than letting media()'s
+                // IllegalArgumentException escape open() unchecked.
+                if (sequenceNumber <= 0) {
+                    throw IOException("Bad SABR sequence in $uri")
+                }
+                return SabrSegmentKey.media(format, sequenceNumber)
             } catch (e: NumberFormatException) {
                 throw IOException("Bad SABR sequence in $uri", e)
             }
