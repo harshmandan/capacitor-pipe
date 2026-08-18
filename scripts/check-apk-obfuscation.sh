@@ -151,6 +151,23 @@ want_absent 'googlevideo.com' \
 want_absent 'X-YouTube-Client' \
     'YouTube client headers are encrypted'
 
+printf '\n\033[1mThe plugin dex names no YouTube at all\033[0m\n'
+
+# The strongest guard: after R8 (names), strenc (jar literals) and PipeObf (our
+# own Kotlin literals), the compiled code should not contain the substring
+# "youtube" ANYWHERE. Asset files are excluded on purpose — okhttp's
+# PublicSuffixDatabase.list enumerates every domain including youtube.com, and a
+# demo app's own HTML is its content, neither being the plugin's dex.
+checks=$((checks + 1))
+DEX_HITS="$(cat "$WORK"/classes*.dex | tr -c '[:print:]' '\n' | grep -ic 'youtube' || true)"
+if [ "$DEX_HITS" -eq 0 ]; then
+    printf '  \033[32mok\033[0m    zero "youtube" occurrences in the dex\n'
+else
+    printf '  \033[31mFAIL\033[0m  %s "youtube" occurrence(s) survive in the dex\n' "$DEX_HITS"
+    cat "$WORK"/classes*.dex | tr -c '[:print:]' '\n' | grep -i 'youtube' | sort -u | sed 's/^/          /' | head
+    failures=$((failures + 1))
+fi
+
 printf '\n\033[1mKNOWN-VISIBLE — asserted so a change is noticed, not because it is good\033[0m\n'
 
 # Deliberately left plaintext: generic protocol vocabulary that names no host or

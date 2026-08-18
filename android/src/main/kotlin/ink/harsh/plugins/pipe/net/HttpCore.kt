@@ -1,5 +1,7 @@
 package ink.harsh.plugins.pipe.net
 
+import ink.harsh.plugins.pipe.util.PipeObf
+
 import okhttp3.Call
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -135,7 +137,7 @@ object HttpCore {
         }
         // Case-insensitive, like the User-Agent and Content-Type checks above:
         // a caller sending "cookie:" must not get our default stacked on top.
-        if (url.contains("youtube.com") && (headers == null || !hasHeader(headers, "Cookie"))) {
+        if (url.contains(PipeObf.d("\u0022\u0033\u0028\u002a\u002a\u0002\u0004\u004c\u0000\u000b\u0008")) && (headers == null || !hasHeader(headers, "Cookie"))) {
             builder.header("Cookie", YOUTUBE_COOKIE)
         }
 

@@ -80,29 +80,32 @@ loads every literal via `ldc`. It is a `-XD` internal javac flag; if a future JD
 drops it, concatenation reverts to invokedynamic and the leak returns **silently**.
 `check-apk-obfuscation.sh` over the release APK is the backstop that catches it.
 
-## What is NOT covered — the plugin's own code
+## The plugin's own code — covered separately, via PipeObf
 
 `strenc` post-processes the extractor **jars**. The plugin's own Kotlin
-(`android/src/main/kotlin`) is shipped as **source** and compiled by the
-consuming app, so there is no jar for `strenc` to rewrite, and only the
-consumer's R8 touches it.
+(`android/src/main/kotlin`) ships as **source** and is compiled by the consuming
+app, so there is no jar for `strenc` to rewrite. Its identifying literals are
+handled at the source level instead:
 
-That code still contains identifying literals, and a grep over a release APK
-finds them today:
+- **Renamed**, where a name carried `Youtube` redundantly (the package is already
+  `.youtube`): the data class `YoutubePageAttestationBootstrap →
+  PageAttestationBootstrap` (its Kotlin `toString()` baked the old name in), the
+  log tag and the warm-up thread name.
+- **Obfuscated** via [`PipeObf`](android/src/main/kotlin/ink/harsh/plugins/pipe/util/PipeObf.kt),
+  the runtime twin of `Codec` with the same committed key: the attestation
+  diagnostics, the `youtube.com` hosts, and the `YoutubeMusicPremiumContentException`
+  literal we must match by simple name (DIVERGENCES.md §10). Because `PipeObf.d`
+  runs at runtime, an exception message still reads correctly in logcat — only
+  the dex and the source hold ciphertext.
 
-- attestation diagnostics in `PipeAttestationBootstrap.kt` /
-  `PipeBotGuardMinter.kt` — e.g. `"YouTube home has no client context"`;
-- data-class names baked into Kotlin-generated `toString()` — e.g.
-  `YoutubePageAttestationBootstrap`, `YoutubeGlobalPoToken`;
-- the exception simple name `YoutubeMusicPremiumContentException`, which is a
-  string literal by necessity (DIVERGENCES.md §10);
-- a few `https://www.youtube.com` bases in `HttpCore.kt` / `PipeWebViewRuntime.kt`.
+The ciphertext↔plaintext table is committed at
+[`tools/strenc/kotlin-strings.md`](tools/strenc/kotlin-strings.md) so a garbled
+value in a log or the source can always be looked up, and `PipeObfTest` asserts
+every row round-trips.
 
-These are **not** hidden. They are our own diagnostics and type names, they carry
-less than the endpoints did, and hiding them means obfuscating error messages
-(worse crash logs for consumers) and renaming classes that mirror upstream for
-port-sync. Whether that trade is worth making is a deliberate open decision, not
-an oversight — recorded here so it stays visible.
+Result: a `grep -i youtube` over the plugin's compiled dex returns **nothing**.
+(The example app's own demo HTML and okhttp's `PublicSuffixDatabase.list` — a
+list of every public domain — still match, but neither is the plugin.)
 
 ## Tests
 

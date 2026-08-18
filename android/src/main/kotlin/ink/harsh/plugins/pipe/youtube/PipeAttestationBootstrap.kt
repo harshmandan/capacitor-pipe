@@ -12,6 +12,8 @@
  */
 package ink.harsh.plugins.pipe.youtube
 
+import ink.harsh.plugins.pipe.util.PipeObf
+
 import com.grack.nanojson.JsonParser
 import org.schabi.newpipe.extractor.services.youtube.sabr.exception.SabrProtocolException
 
@@ -21,7 +23,7 @@ internal enum class YoutubePoTokenBinding {
     NONE,
 }
 
-internal data class YoutubePageAttestationBootstrap(
+internal data class PageAttestationBootstrap(
     val visitorData: String,
     val dataSyncId: String?,
     val clientName: String,
@@ -38,9 +40,9 @@ internal data class SabrAttChallengeData(
     val interpreterUrl: String?,
 )
 
-internal fun parseYoutubePageAttestationBootstrap(
+internal fun parsePageAttestationBootstrap(
     pageHtml: String,
-): YoutubePageAttestationBootstrap {
+): PageAttestationBootstrap {
     val configCalls = extractObjectCallArguments(pageHtml, YTCFG_CALLEE)
         .mapNotNull { call ->
             try {
@@ -53,33 +55,33 @@ internal fun parseYoutubePageAttestationBootstrap(
         .asSequence()
         .mapNotNull { call -> parseInitialAttestationChallenge(call.argument)?.let { call to it } }
         .firstOrNull()
-        ?: throw SabrProtocolException("YouTube home has no initial attestation challenge")
+        ?: throw SabrProtocolException(PipeObf.d("\u0002\u0033\u0028\u000a\u002a\u0002\u0004\u0042\u000b\u000b\u0008\u0003\u0047\u0000\u0008\u0019\u004b\u0002\u0002\u004e\u0006\u001e\u0018\u0006\u001a\u0015\u0019\u0056\u0016\u000c\u000d\u001f\u0008\u0008\u001c\u000a\u0016\u00ef\u00ef\u00a2\u00e0\u00ec\u00e4\u00ea\u00eb\u00ed\u00e7\u00ed\u00ee"))
     val configs = configCalls
         .filter { (call) -> call.start < challengeCall.first.start }
         .map { (_, config) -> config }
     val clientConfig = configs.lastOrNull { it.has("INNERTUBE_CONTEXT") }
-        ?: throw SabrProtocolException("YouTube home has no client context")
+        ?: throw SabrProtocolException(PipeObf.d("\u0002\u0033\u0028\u000a\u002a\u0002\u0004\u0042\u000b\u000b\u0008\u0003\u0047\u0000\u0008\u0019\u004b\u0002\u0002\u004e\u000c\u001c\u0018\u0017\u001d\u0000\u0055\u0015\u0018\u0016\u000d\u001f\u0003\u0008"))
     val eventId = configs.asSequence()
         .mapNotNull { it.getString("EVENT_ID")?.takeIf(String::isNotEmpty) }
         .lastOrNull()
-        ?: throw SabrProtocolException("YouTube home has no EVENT_ID")
+        ?: throw SabrProtocolException(PipeObf.d("\u0002\u0033\u0028\u000a\u002a\u0002\u0004\u0042\u000b\u000b\u0008\u0003\u0047\u0000\u0008\u0019\u004b\u0002\u0002\u004e\u002a\u0026\u0034\u003c\u0027\u002b\u003c\u0032"))
     val visitorData = (
         clientConfig.getString("EOM_VISITOR_DATA")?.takeIf(String::isNotEmpty)
             ?: clientConfig.getString("VISITOR_DATA")?.takeIf(String::isNotEmpty)
         )?.replace("%3D", "=", ignoreCase = true)
-        ?: throw SabrProtocolException("YouTube home has no anonymous visitor data")
+        ?: throw SabrProtocolException(PipeObf.d("\u0002\u0033\u0028\u000a\u002a\u0002\u0004\u0042\u000b\u000b\u0008\u0003\u0047\u0000\u0008\u0019\u004b\u0002\u0002\u004e\u000e\u001e\u001e\u001c\u000a\u0019\u001a\u0003\u0004\u0058\u000f\u0013\u0008\u0015\u0009\u0011\u000d\u00a0\u00e5\u00e3\u00f7\u00e5"))
     val dataSyncId = configs.asSequence()
         .mapNotNull { it.getString("DATASYNC_ID")?.takeIf(String::isNotEmpty) }
         .lastOrNull()
     val client = clientConfig.getObject("INNERTUBE_CONTEXT")?.getObject("client")
-        ?: throw SabrProtocolException("YouTube home has no Innertube client context")
+        ?: throw SabrProtocolException(PipeObf.d("\u0002\u0033\u0028\u000a\u002a\u0002\u0004\u0042\u000b\u000b\u0008\u0003\u0047\u0000\u0008\u0019\u004b\u0002\u0002\u004e\u0026\u001e\u001f\u0017\u0001\u0000\u0000\u0014\u0012\u0058\u001a\u0016\u0012\u0019\u0013\u000a\u005f\u00e3\u00ee\u00ec\u00f7\u00e1\u00fd\u00f2"))
     val clientName = client.getString("clientName")?.takeIf(String::isNotEmpty)
-        ?: throw SabrProtocolException("YouTube home has no client name")
+        ?: throw SabrProtocolException(PipeObf.d("\u0002\u0033\u0028\u000a\u002a\u0002\u0004\u0042\u000b\u000b\u0008\u0003\u0047\u0000\u0008\u0019\u004b\u0002\u0002\u004e\u000c\u001c\u0018\u0017\u001d\u0000\u0055\u0018\u0016\u0015\u001c"))
     if (clientName != "WEB") {
-        throw SabrProtocolException("Unsupported YouTube home client: $clientName")
+        throw SabrProtocolException(PipeObf.d("\u000e\u0032\u002e\u002b\u002f\u0010\u000e\u0010\u0017\u0001\u0001\u0046\u003e\u0007\u001c\u003e\u001e\u000e\u0008\u004e\u0007\u001f\u001c\u0017\u0053\u0017\u0019\u001f\u0012\u0016\u000d\u0040\u005b") + clientName)
     }
     val clientVersion = client.getString("clientVersion")?.takeIf(String::isNotEmpty)
-        ?: throw SabrProtocolException("YouTube home has no client version")
+        ?: throw SabrProtocolException(PipeObf.d("\u0002\u0033\u0028\u000a\u002a\u0002\u0004\u0042\u000b\u000b\u0008\u0003\u0047\u0000\u0008\u0019\u004b\u0002\u0002\u004e\u000c\u001c\u0018\u0017\u001d\u0000\u0055\u0000\u0012\u000a\u000a\u0013\u0014\u0012"))
     val watchConfig = clientConfig.getObject("WEB_PLAYER_CONTEXT_CONFIGS")
         ?.getObject("WEB_PLAYER_CONTEXT_CONFIG_ID_KEVLAR_WATCH")
     val experimentFlags = watchConfig?.getString("serializedExperimentFlags")
@@ -95,7 +97,7 @@ internal fun parseYoutubePageAttestationBootstrap(
         watchConfig == null -> YoutubePoTokenBinding.CONTENT
         else -> YoutubePoTokenBinding.NONE
     }
-    return YoutubePageAttestationBootstrap(
+    return PageAttestationBootstrap(
         visitorData,
         dataSyncId,
         clientName,

@@ -1,5 +1,7 @@
 package ink.harsh.plugins.pipe
 
+import ink.harsh.plugins.pipe.util.PipeObf
+
 import android.util.Log
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
@@ -134,7 +136,7 @@ class PipeExtractor {
             "PrivateContentException",
             "PaidContentException",
             "AccountTerminatedException",
-            "YoutubeMusicPremiumContentException",
+            PipeObf.d("\u0002\u0033\u0028\u002a\u002a\u0002\u0004\u002f\u0016\u0017\u000c\u0005\u0037\u001a\u000c\u0007\u0002\u0019\u0000\u002d\u0000\u001e\u0005\u0017\u001d\u0000\u0030\u000e\u0014\u001d\u0009\u000e\u0012\u0013\u0013"),
             "SoundCloudGoPlusContentException",
             "LiveNotStartException",
             "VideoNotReleaseException",

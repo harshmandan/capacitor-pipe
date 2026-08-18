@@ -289,6 +289,14 @@ dependencies {
     androidTestImplementation 'androidx.dynamicanimation:dynamicanimation:1.1.0'
 
     testImplementation "junit:junit:$junitVersion"
+    /*
+     * The Compose compiler plugin runs over the local unit-test source set too,
+     * and fails ("Compose Runtime ... none could be found") if the runtime is
+     * absent — Compose is compileOnly for main, so it is not on the test
+     * classpath by default. Test-scoped, so it never reaches a consuming app.
+     */
+    testImplementation platform("androidx.compose:compose-bom:$composeBomVersion")
+    testImplementation 'androidx.compose.runtime:runtime'
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
 

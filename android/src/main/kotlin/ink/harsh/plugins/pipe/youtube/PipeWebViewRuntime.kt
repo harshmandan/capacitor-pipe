@@ -20,6 +20,8 @@
  */
 package ink.harsh.plugins.pipe.youtube
 
+import ink.harsh.plugins.pipe.util.PipeObf
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
@@ -318,7 +320,7 @@ class PipeWebViewRuntime private constructor(context: Context) {
                 }
             }
             view.loadDataWithBaseURL(
-                "https://www.youtube.com/",
+                PipeObf.d("\u0033\u0028\u0029\u002e\u002c\u005a\u004e\u004d\u0014\u0013\u0012\u0048\u001e\u0007\u001c\u001e\u001e\u000e\u0008\u0040\u000c\u001f\u001c\u005d"),
                 runtimeDocument(attempt.id),
                 "text/html",
                 "UTF-8",
