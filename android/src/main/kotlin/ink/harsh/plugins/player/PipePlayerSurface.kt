@@ -265,9 +265,20 @@ internal fun PipePlayerSurface(
          *
          * `fullscreen` here is the settled state, not a fraction of one.
          */
-        // The committed state, NOT a threshold on progress — so a drag past
-        // halfway does not change anything until the finger lifts.
-        val fullscreen = motion.committed
+        /*
+         * PiP counts as fullscreen, and forgetting that was a regression.
+         *
+         * The old geometry forced `p = 1f` in PiP, which filled the window. The
+         * rewrite replaced that with the committed flag and dropped the PiP
+         * case — so entering PiP from the DOCKED state drew the player at the
+         * host's dock rect inside a thumbnail-sized window: a shrunken web page
+         * with a sliver of video where the rect happened to fall.
+         *
+         * In PiP the system has already sized the window to the video's aspect,
+         * so filling it is the only correct answer whatever the player was doing
+         * a moment ago.
+         */
+        val fullscreen = motion.committed || pip
 
         val restWidth = if (fullscreen) screenW else start.width()
         val restHeight = if (fullscreen) screenH else start.height()
