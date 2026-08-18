@@ -72,7 +72,7 @@ on. Add to them whenever the wrapper starts calling something new.
 [DIVERGENCES.md](DIVERGENCES.md) records every point where our code forks to
 handle the two engines differently, with file and symbol anchors and what to
 re-check per dependency. `scripts/check-divergences.sh` asserts them against both
-submodules' source (29 checks), and `update-extractors.sh` runs it before
+submodules' source (39 checks), and `update-extractors.sh` runs it before
 rebuilding, rolling the pins back if anything changed.
 
 ```bash
@@ -392,22 +392,19 @@ The pinch handler is hand-rolled with `awaitEachGesture` and ignores every event
 until at least two pointers are down, so one-finger gestures are never touched.
 Same hazard applies to `detectDragGestures` layered over a tap detector.
 
-### 17. A `ModalBottomSheet` cannot be rotated by its parent
+### 17. A `ModalBottomSheet` lives in its own window — twice over
 
-It renders in its **own window**, not in your composable tree, so wrapping it in
-a rotated `graphicsLayer` does nothing at all. During the fake-rotated
-fullscreen (portrait Activity, video turned 90°) that left an upright sheet over
-a sideways video.
+It renders in its **own window**, not in your composable tree, so no transform
+of yours can turn it; a landscape sheet requires a genuinely landscape Activity
+(which fullscreen now is — `alignActivityWithVideo` remains as a belt-and-braces
+nudge for the async gap between commit and configuration change).
 
-The fix is to make the Activity genuinely landscape when a sheet opens there —
-`PipePlayerOverlay.alignActivityWithVideo`. It is seamless because the surface
-only applies its own rotation while the Activity is portrait, so the fake
-rotation switches off in the same frame the real one arrives and the video does
-not move.
-
-Known limitation, not yet solved: the sheet's window does not inherit the
-immersive flags, so the system bars reappear while a sheet is open in
-fullscreen.
+Same trap, second form: that window does not inherit the Activity's immersive
+flags, so sheets un-hid the system bars in fullscreen. The `DialogWindowProvider`
+remedy only works when the lookup runs **inside** the `ModalBottomSheet` content
+lambda, where `LocalView` is the sheet window's view. At the composable's top
+level the cast silently returns null and the fix never runs — which is exactly
+how it shipped broken the first time.
 
 ### 18. `SCREEN_ORIENTATION_SENSOR_LANDSCAPE` rotates twice
 
@@ -515,27 +512,56 @@ nothing else; the state change is **discrete, on release**, carried by the
 system's own rotation; and steady-state fullscreen is a genuinely landscape
 Activity, so there is one coordinate frame rather than two.
 
-Three rules that each cost a debugging round:
+Rules that each cost a debugging round:
 
-- **Every consequence of fullscreen reads `motion.committed`, never `progress`.**
-  Geometry, system bars, chrome layout and orientation each leaked in turn: a
-  drag past halfway hid the navigation bar, grew the buttons and showed the
-  title, over a player that had not moved and could still be dragged back.
-- **Two black layers, different jobs.** The *backdrop* sits behind the player and
-  hides the host's page. The *shutter* is drawn last, over the player and its
-  chrome, and hides the switch. Conflating them left the player's own resize and
-  chrome swap fully visible — frame-stepping a recording is what showed it.
-- **The commit outlives the gesture.** Committing detaches the drag modifier,
-  which cancels its coroutine; running the choreography there killed it at the
-  delay and left the screen black over a working player. Launch it on the
-  surface's scope, and clean up in a `finally`.
+- **Intent reads `motion.committed`; geometry reads the MEASURED window.**
+  Bars, chrome layout and the orientation request hang off the committed latch
+  (never `progress` — a drag past halfway must change nothing until release).
+  But the video's *rect* keys off `screenW > screenH`: keyed to `committed` it
+  resized to fullscreen while the window was still portrait, and that one wrong
+  frame was the only reason the shutter ever had to cover the video. Caveat
+  this inherits: a landscape-*shaped* docked window (tablet, DeX, desktop
+  windowing) reads as fullscreen — acceptable for a portrait-locked phone host,
+  wrong the day that assumption moves.
+- **One black layer, behind the video.** It hides the host's page and doubles as
+  the shutter (`alpha = max(backdrop, curtain)`); the chrome hides on
+  `transitioning`. The video itself stays visible and rotates with the system.
+  Entering, the shutter **fades** in (the fade is the start of the transition);
+  leaving, it **snaps** — fading up over a playing video reads as the video
+  dissolving.
+- **The commit outlives the gesture, and commits can overlap.** Launch the
+  choreography on the surface's scope (the drag modifier's own coroutine dies
+  when committing detaches it), and every stage plus the `finally` checks a
+  generation counter — a superseded commit must not lower the curtain or clear
+  `transitioning` under its successor. Gestures are disabled while
+  `transitioning`, because the shutter deliberately does not intercept touches.
+- **The sensor and the buttons share custody of orientation.**
+  `suppressAutoFullscreen` stops a still-sideways phone re-entering after a
+  swipe-down exit; `holdLandscape` is its mirror — button-fullscreen while the
+  phone is upright must not be undone by the very next (portrait) sensor
+  reading. Every programmatic `requestedOrientation` write syncs the listener's
+  dedup via `noteRequested`, or it swallows and repeats requests unpredictably.
 
-Lowering the shutter waits for the geometry to stop moving rather than a fixed
-delay — the orientation change, window resize and the host's re-`dock()` land
-whenever they land. See `PipePlayerOverlay.awaitStableGeometry`, bounded so a
-host that re-docks forever cannot pin the shutter up.
+Lowering the shutter waits for the switch to *begin* (configuration matches the
+committed state) and then for the geometry to go quiet — never a fixed delay;
+the orientation change, window resize and the host's re-`dock()` land whenever
+they land. See `PipePlayerOverlay.awaitStableGeometry`, bounded so a host that
+re-docks forever cannot pin the shutter up.
 
-### 25. KDoc is Markdown, not Javadoc
+### 25. Never read `progress` or `curtain` in composition
+
+Both Animatables move every frame of a drag or fade, and a composition-scope
+read re-executes the entire surface — rect maths, modifier chains, gesture
+nodes — per frame, allocating as it goes. The pattern that replaced it: rest
+geometry is composition state (changes rarely); the per-frame values are read
+in **deferred scopes** — the `offset {}` lambda for placement, `graphicsLayer`
+for the pick-up scale, `drawBehind` for the black layer — and the few
+structural questions ("is it at docked rest?") go through `derivedStateOf` so
+composition invalidates only when the answer changes. Same idea one level up:
+the 4 Hz playhead travels as `State<Long>` read only where it is drawn, never
+as a field of the chrome-state data class.
+
+### 26. KDoc is Markdown, not Javadoc
 
 Six player files carried `<p>`, `<b>`, `<pre>` and `{@link}` — habits that came
 across with the ported Java sources. None of it renders: KDoc uses Markdown, so
