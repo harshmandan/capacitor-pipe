@@ -18,6 +18,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
@@ -51,10 +53,9 @@ data class SheetOption(
  * people reach for without thinking, so reimplementing them badly is worse than
  * taking the dependency.
  *
- * Consequence worth knowing: because it is not inside the rotated box, it
- * appears in the Activity's orientation. In a genuinely landscape Activity that
- * is correct; during the fake-rotated fullscreen it is upright over a rotated
- * video, which is the honest trade for it being a real page-level sheet.
+ * Consequence worth knowing: because it renders in its own window, it appears
+ * in the Activity's orientation — which is why fullscreen makes the Activity
+ * genuinely landscape before a sheet can open.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,24 +70,18 @@ internal fun PipePlayerSheet(
     immersive: Boolean = false,
 ) {
     val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
 
     /*
-     * A ModalBottomSheet renders in its OWN window, and that window does not
-     * inherit the Activity's immersive flags. Opening speed or quality in
-     * fullscreen therefore made the status and navigation bars reappear over the
-     * video — the sheet was quietly un-hiding them.
+     * Selection plays the exit animation before reporting.
      *
-     * DialogWindowProvider is how Compose exposes that window; hiding the bars
-     * on it too is the standard remedy.
+     * `onSelect` removes this composable from the tree, and a ModalBottomSheet
+     * that leaves composition simply vanishes — the slide-out it owes the eye
+     * only runs if it is asked to hide FIRST. The scrim-tap and back paths get
+     * this for free, because the sheet hides itself before onDismissRequest.
      */
-    val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
-    LaunchedEffect(dialogWindow, immersive) {
-        val window = dialogWindow ?: return@LaunchedEffect
-        if (!immersive) return@LaunchedEffect
-        WindowCompat.getInsetsController(window, window.decorView).apply {
-            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            hide(WindowInsetsCompat.Type.systemBars())
-        }
+    fun settle(action: () -> Unit) {
+        scope.launch { sheetState.hide() }.invokeOnCompletion { action() }
     }
 
     // The player is always dark; inheriting a host's light theme would put black
@@ -96,6 +91,29 @@ internal fun PipePlayerSheet(
             onDismissRequest = onDismiss,
             sheetState = sheetState,
         ) {
+            /*
+             * A ModalBottomSheet renders in its OWN window, and that window
+             * does not inherit the Activity's immersive flags — opening speed
+             * or quality in fullscreen quietly un-hid the system bars.
+             *
+             * The lookup has to happen HERE, inside the sheet's content, where
+             * LocalView is the sheet window's own view and its parent is the
+             * DialogWindowProvider. At the composable's top level LocalView is
+             * still the Activity-side host view, the cast returns null, and
+             * the whole fix silently never runs — which is exactly how it
+             * shipped broken the first time.
+             */
+            val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+            LaunchedEffect(dialogWindow, immersive) {
+                val window = dialogWindow ?: return@LaunchedEffect
+                if (!immersive) return@LaunchedEffect
+                WindowCompat.getInsetsController(window, window.decorView).apply {
+                    systemBarsBehavior =
+                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    hide(WindowInsetsCompat.Type.systemBars())
+                }
+            }
+
             Column(Modifier.navigationBarsPadding()) {
                 Text(
                     text = title,
@@ -109,7 +127,7 @@ internal fun PipePlayerSheet(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clickable { onSelect(option.id) }
+                            .clickable { settle { onSelect(option.id) } }
                             .padding(horizontal = 24.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {

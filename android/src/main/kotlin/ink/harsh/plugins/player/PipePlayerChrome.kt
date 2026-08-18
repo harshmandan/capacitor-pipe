@@ -34,8 +34,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -46,12 +44,17 @@ import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
@@ -84,12 +87,18 @@ data class PipePlayerExtraButton(
     val svgPath: String,
 )
 
+/**
+ * Everything the chrome renders, EXCEPT the playhead.
+ *
+ * Position and buffered-ahead deliberately travel as separate [State] rather
+ * than as fields here: they tick four times a second forever, and a field
+ * would recompose every consumer of this class on every tick. As `State`
+ * they are read only where they are drawn — the timestamp, the scrubber and
+ * the compact progress line.
+ */
 internal data class PipePlayerChromeState(
     val playing: Boolean,
-    val positionMs: Long,
     val durationMs: Long,
-    /** How far ahead media is buffered, for the seekbar's middle layer. */
-    val bufferedMs: Long,
     val fullscreen: Boolean,
     /** Playback has reached the end, so the centre button offers a restart. */
     val ended: Boolean,
@@ -110,9 +119,6 @@ internal data class PipePlayerChromeState(
     val speedLabel: String,
     /** Current quality, e.g. "720p". */
     val qualityLabel: String,
-    /** Options the host offers. The player presents them; it does not invent them. */
-    val speedOptions: List<SheetOption>,
-    val qualityOptions: List<SheetOption>,
     /** At most one, occupying the third slot in the top row. */
     val extraButton: PipePlayerExtraButton?,
 )
@@ -130,8 +136,6 @@ internal data class PipePlayerChromeCallbacks(
     val onQuality: () -> Unit,
     val onSpeed: () -> Unit,
     val onExtraButton: (String) -> Unit,
-    val onSpeedSelected: (String) -> Unit,
-    val onQualitySelected: (String) -> Unit,
     val onSeek: (Long) -> Unit,
 )
 
@@ -150,6 +154,9 @@ internal data class PipePlayerChromeCallbacks(
 @Composable
 internal fun PipePlayerChrome(
     state: PipePlayerChromeState,
+    /** Playhead and buffered-ahead, read only where they are drawn. */
+    position: State<Long>,
+    buffered: State<Long>,
     callbacks: PipePlayerChromeCallbacks,
     modifier: Modifier = Modifier,
 ) {
@@ -181,7 +188,7 @@ internal fun PipePlayerChrome(
     ) {
         TopRow(state, callbacks, metrics, Modifier.align(Alignment.TopCenter))
         CentreRow(state, callbacks, metrics, Modifier.align(Alignment.Center))
-        BottomBar(state, callbacks, metrics, Modifier.align(Alignment.BottomCenter))
+        BottomBar(state, position, buffered, callbacks, metrics, Modifier.align(Alignment.BottomCenter))
     }
 }
 
@@ -226,7 +233,12 @@ private fun TopRow(
          */
         if (!state.fullscreen && state.canMinimise) {
             Box(Modifier.align(Alignment.TopStart)) {
-                ChromeButton(Icons.Filled.KeyboardArrowDown, callbacks.onMinimise, metrics)
+                ChromeButton(
+                    Icons.Filled.KeyboardArrowDown,
+                    callbacks.onMinimise,
+                    metrics,
+                    label = "Minimise player",
+                )
             }
         }
 
@@ -270,14 +282,27 @@ private fun TopRow(
             Modifier.align(Alignment.TopEnd),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ValueButton(Icons.Filled.Speed, state.speedLabel, callbacks.onSpeed, metrics)
+            ValueButton(
+                Icons.Filled.Speed,
+                state.speedLabel,
+                "Playback speed",
+                callbacks.onSpeed,
+                metrics,
+            )
             Spacer(Modifier.width(6.dp))
-            ValueButton(Icons.Filled.HighQuality, state.qualityLabel, callbacks.onQuality, metrics)
+            ValueButton(
+                Icons.Filled.HighQuality,
+                state.qualityLabel,
+                "Quality",
+                callbacks.onQuality,
+                metrics,
+            )
             state.extraButton?.let { button ->
                 Spacer(Modifier.width(6.dp))
                 ChromeButton(
                     onClick = { callbacks.onExtraButton(button.id) },
                     metrics = metrics,
+                    label = button.id,
                     svgPath = button.svgPath,
                 )
             }
@@ -302,6 +327,7 @@ private fun CentreRow(
                 Icons.Filled.SkipPrevious,
                 callbacks.onPrevious,
                 metrics,
+                label = "Previous",
                 size = metrics.skipButton,
                 glyph = metrics.skipGlyph,
             )
@@ -320,6 +346,11 @@ private fun CentreRow(
             },
             if (state.ended) callbacks.onReplay else callbacks.onPlayPause,
             metrics,
+            label = when {
+                state.ended -> "Replay"
+                state.playing -> "Pause"
+                else -> "Play"
+            },
             size = metrics.playButton,
             glyph = metrics.playGlyph,
         )
@@ -328,6 +359,7 @@ private fun CentreRow(
                 Icons.Filled.SkipNext,
                 callbacks.onNext,
                 metrics,
+                label = "Next",
                 size = metrics.skipButton,
                 glyph = metrics.skipGlyph,
             )
@@ -338,6 +370,8 @@ private fun CentreRow(
 @Composable
 private fun BottomBar(
     state: PipePlayerChromeState,
+    position: State<Long>,
+    buffered: State<Long>,
     callbacks: PipePlayerChromeCallbacks,
     metrics: ChromeMetrics,
     modifier: Modifier,
@@ -372,9 +406,9 @@ private fun BottomBar(
                      * which looks like a stall rather than like a live edge.
                      */
                     text = if (state.live) {
-                        formatTime(state.positionMs)
+                        formatTime(position.value)
                     } else {
-                        "${formatTime(state.positionMs)} / ${formatTime(state.durationMs)}"
+                        "${formatTime(position.value)} / ${formatTime(state.durationMs)}"
                     },
                     style = TextStyle(color = Color.White, fontSize = 12.sp),
                 )
@@ -388,11 +422,12 @@ private fun BottomBar(
                 if (state.fullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
                 callbacks.onFullscreen,
                 metrics,
+                label = if (state.fullscreen) "Exit fullscreen" else "Fullscreen",
             )
         }
 
         Spacer(Modifier.height(8.dp))
-        Scrubber(state, callbacks.onSeek)
+        Scrubber(state, position, buffered, callbacks.onSeek)
     }
 }
 
@@ -405,21 +440,26 @@ private fun BottomBar(
  * across a long video does not fire a seek per frame.
  */
 @Composable
-private fun Scrubber(state: PipePlayerChromeState, onSeek: (Long) -> Unit) {
-    val played = when {
+private fun Scrubber(
+    state: PipePlayerChromeState,
+    position: State<Long>,
+    buffered: State<Long>,
+    onSeek: (Long) -> Unit,
+) {
+    /*
+     * Computed on demand, never in composition. The playhead ticks four times
+     * a second forever; reading it here would recompose the scrubber on every
+     * tick. The draw lambda and the gesture handlers read it instead, so a
+     * tick costs one redraw of this canvas and nothing else.
+     */
+    fun playedFraction(): Float = when {
         state.live -> 1f
         state.durationMs <= 0L -> 0f
-        else -> (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f)
-    }
-    val buffered = when {
-        state.live -> 1f
-        state.durationMs <= 0L -> 0f
-        else -> (state.bufferedMs.toFloat() / state.durationMs).coerceIn(played, 1f)
+        else -> (position.value.toFloat() / state.durationMs).coerceIn(0f, 1f)
     }
 
     // While dragging, the bar follows the finger rather than playback.
     var dragFraction by remember { mutableStateOf<Float?>(null) }
-    val shown = dragFraction ?: played
 
     // Live has no seekable timeline: the bar is a state indicator, not a control.
     val seekable = !state.live && state.durationMs > 0L
@@ -453,7 +493,7 @@ private fun Scrubber(state: PipePlayerChromeState, onSeek: (Long) -> Unit) {
                                 onDragCancel = { dragFraction = null },
                             ) { change, amount ->
                                 val width = size.width.toFloat()
-                                dragFraction = ((dragFraction ?: played) + amount / width)
+                                dragFraction = ((dragFraction ?: playedFraction()) + amount / width)
                                     .coerceIn(0f, 1f)
                                 change.consume()
                             }
@@ -465,8 +505,19 @@ private fun Scrubber(state: PipePlayerChromeState, onSeek: (Long) -> Unit) {
         Canvas(
             Modifier
                 .fillMaxWidth()
-                .height(4.dp),
+                .height(4.dp)
+                .semantics { contentDescription = "Seek bar" },
         ) {
+            // Read inside the draw scope, so a position tick invalidates only
+            // this draw — not the composition around it.
+            val played = playedFraction()
+            val shown = dragFraction ?: played
+            val bufferedFraction = when {
+                state.live -> 1f
+                state.durationMs <= 0L -> 0f
+                else -> (buffered.value.toFloat() / state.durationMs).coerceIn(played, 1f)
+            }
+
             val radius = CornerRadius(size.height / 2f)
             // Three layers: track, buffered, played. Buffered sits between the
             // two so a viewer can tell "not downloaded yet" from "not watched
@@ -474,7 +525,7 @@ private fun Scrubber(state: PipePlayerChromeState, onSeek: (Long) -> Unit) {
             drawRoundRect(color = Color.White.copy(alpha = 0.25f), cornerRadius = radius)
             drawRoundRect(
                 color = Color.White.copy(alpha = 0.45f),
-                size = size.copy(width = size.width * buffered),
+                size = size.copy(width = size.width * bufferedFraction),
                 cornerRadius = radius,
             )
             drawRoundRect(
@@ -630,6 +681,8 @@ internal data class ChromeMetrics(
 private fun ValueButton(
     icon: ImageVector,
     label: String,
+    /** What the button IS, for TalkBack — the label only says its current value. */
+    description: String,
     onClick: () -> Unit,
     metrics: ChromeMetrics,
 ) {
@@ -644,6 +697,10 @@ private fun ValueButton(
             .clip(RoundedCornerShape(50))
             .background(SCRIM)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .semantics {
+                role = Role.Button
+                contentDescription = "$description: $label"
+            }
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -673,6 +730,8 @@ private fun ChromeButton(
     icon: ImageVector? = null,
     onClick: () -> Unit,
     metrics: ChromeMetrics,
+    /** What TalkBack announces. The glyphs carry no text of their own. */
+    label: String,
     svgPath: String? = null,
     size: Dp = metrics.control,
     glyph: Dp = metrics.glyph,
@@ -689,21 +748,17 @@ private fun ChromeButton(
             .size(size)
             .clip(CircleShape)
             .background(SCRIM)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .semantics {
+                role = Role.Button
+                contentDescription = label
+            },
         contentAlignment = Alignment.Center,
     ) {
         when {
             icon != null -> Glyph(icon, glyph)
             svgPath != null -> SvgGlyph(svgPath, glyph)
         }
-    }
-}
-
-@Composable
-internal fun TintedGlyph(icon: ImageVector, size: Dp, tint: Color) {
-    val painter = rememberVectorPainter(icon)
-    Canvas(Modifier.size(size)) {
-        with(painter) { draw(this@Canvas.size, colorFilter = ColorFilter.tint(tint)) }
     }
 }
 
@@ -753,9 +808,17 @@ private val SCRIM = Color.Black.copy(alpha = 0.4f)
  * The zero floor stays deliberately. `getStringForTime` renders TIME_UNSET and
  * negatives its own way, and this player reaches here with 0 for a live stream
  * (which has no duration) — "0:00" is the answer we want in that case.
+ *
+ * The builder/formatter pair is reused, as Media3's own players do: this runs
+ * at least twice per position tick, and allocating both per call was steady
+ * garbage for no benefit. Main-thread only, like all of Compose — which is
+ * what makes the shared pair safe.
  */
+private val timeBuilder = StringBuilder()
+private val timeFormatter = Formatter(timeBuilder)
+
 private fun formatTime(millis: Long): String =
-    if (millis <= 0L) "0:00" else Util.getStringForTime(StringBuilder(), Formatter(), millis)
+    if (millis <= 0L) "0:00" else Util.getStringForTime(timeBuilder, timeFormatter, millis)
 
 /**
  * The controls for a player too small to carry the full set.
@@ -776,6 +839,8 @@ private fun formatTime(millis: Long): String =
 @Composable
 internal fun PipePlayerCompactChrome(
     state: PipePlayerChromeState,
+    /** Playhead, read only inside the progress line's draw scope. */
+    position: State<Long>,
     callbacks: PipePlayerChromeCallbacks,
     modifier: Modifier = Modifier,
     /**
@@ -807,12 +872,18 @@ internal fun PipePlayerCompactChrome(
                     state.playing -> Icons.Filled.Pause
                     else -> Icons.Filled.PlayArrow
                 },
+                label = when {
+                    state.ended -> "Replay"
+                    state.playing -> "Pause"
+                    else -> "Play"
+                },
                 onClick = if (state.ended) callbacks.onReplay else callbacks.onPlayPause,
                 modifier = Modifier.align(Alignment.BottomStart),
             )
 
             CompactButton(
                 icon = Icons.Filled.Fullscreen,
+                label = "Expand player",
                 onClick = callbacks.onExpand,
                 modifier = Modifier.align(Alignment.BottomEnd),
             )
@@ -832,10 +903,12 @@ internal fun PipePlayerCompactChrome(
                 .fillMaxWidth()
                 .height(2.5.dp),
         ) {
+            // Position is read in draw scope, so a tick redraws this line
+            // without recomposing the window around it.
             val played = when {
                 state.live -> 1f
                 state.durationMs <= 0L -> 0f
-                else -> (state.positionMs.toFloat() / state.durationMs).coerceIn(0f, 1f)
+                else -> (position.value.toFloat() / state.durationMs).coerceIn(0f, 1f)
             }
             drawRect(color = Color.White.copy(alpha = 0.30f))
             drawRect(color = state.accent, size = size.copy(width = size.width * played))
@@ -847,6 +920,7 @@ internal fun PipePlayerCompactChrome(
 @Composable
 private fun CompactButton(
     icon: ImageVector,
+    label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -856,7 +930,11 @@ private fun CompactButton(
             .size(32.dp)
             .clip(CircleShape)
             .background(SCRIM)
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick)
+            .semantics {
+                role = Role.Button
+                contentDescription = label
+            },
         contentAlignment = Alignment.Center,
     ) {
         Glyph(icon, 18.dp)

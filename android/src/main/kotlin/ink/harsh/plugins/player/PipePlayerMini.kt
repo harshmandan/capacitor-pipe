@@ -44,6 +44,22 @@ data class PipePlayerMiniConfig(
     val draggable: Boolean = true,
 )
 
+/**
+ * Is a class on the classpath? The player's optional dependencies — Media3,
+ * Compose, core-pip — are all probed this way, and catching `Throwable` is the
+ * point: a missing transitive dependency surfaces as an Error, not an
+ * Exception. Lives in this file deliberately: it has no optional-dependency
+ * imports, so the probe itself can never trigger the class loading it exists
+ * to avoid.
+ */
+internal fun hasPlayerClass(name: String): Boolean =
+    try {
+        Class.forName(name)
+        true
+    } catch (ignored: Throwable) {
+        false
+    }
+
 enum class PipePlayerCorner {
     TOP_LEFT,
     TOP_RIGHT,

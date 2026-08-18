@@ -23,12 +23,8 @@ import kotlinx.coroutines.launch
  *
  * That optionality is silent until runtime: an app without Media3 that calls
  * these methods would get `NoClassDefFoundError`. Every entry point therefore
- * checks [isAvailable] first and rejects with something readable, and
+ * checks availability first and rejects with something readable, and
  * `getPlayerStatus` exists so callers can ask before trying.
- *
- * Phase 1 scope: prove a Compose surface composites over the host WebView
- * with Media3 playing into a docked TextureView. No gestures, no extraction
- * wiring — those are phases 2 and 5.
  */
 private const val TAG = "PipePlayerPlugin"
 
@@ -36,10 +32,15 @@ private const val TAG = "PipePlayerPlugin"
 open class PipePlayerPlugin : Plugin() {
 
     /**
-     * Resolved reflectively, never by a direct reference: touching the overlay
-     * type at all would load Media3 and Compose classes and defeat the point.
+     * Created on first use, tracked so teardown can tell "never used" apart
+     * from "in use". This was `by lazy`, and `handleOnDestroy` reading it to
+     * release it built the entire overlay object during Activity destruction
+     * for apps that never docked a player.
      */
-    private val overlay: PipePlayerOverlay by lazy { createOverlay() }
+    private var overlayInstance: PipePlayerOverlay? = null
+
+    private val overlay: PipePlayerOverlay
+        get() = overlayInstance ?: createOverlay().also { overlayInstance = it }
 
     /**
      * Drives the motion animations.
@@ -92,15 +93,26 @@ open class PipePlayerPlugin : Plugin() {
         }
     }
 
-    /** Accepts #RGB, #RRGGBB and #AARRGGBB. */
-    private fun parseColour(value: String): Int? =
-        runCatching { android.graphics.Color.parseColor(value) }.getOrNull()
+    /**
+     * Accepts #RGB, #ARGB, #RRGGBB and #AARRGGBB.
+     *
+     * The short forms are expanded by hand because `Color.parseColor` throws
+     * on them — the doc used to promise #RGB while silently dropping it.
+     */
+    private fun parseColour(value: String): Int? {
+        val expanded = if (value.startsWith("#") && value.length in 4..5) {
+            "#" + value.drop(1).map { digit -> "$digit$digit" }.joinToString("")
+        } else {
+            value
+        }
+        return runCatching { android.graphics.Color.parseColor(expanded) }.getOrNull()
+    }
 
     override fun handleOnDestroy() {
         scope.cancel()
-        if (available) {
-            runCatching { overlay.release() }
-        }
+        // Only an overlay that exists needs releasing; `overlay` here would
+        // have CREATED one just to tear it down.
+        overlayInstance?.let { runCatching { it.release() } }
         super.handleOnDestroy()
     }
 
@@ -108,23 +120,25 @@ open class PipePlayerPlugin : Plugin() {
     fun getPlayerStatus(call: PluginCall) {
         val result = JSObject()
         result.put("available", available)
-        result.put("media3Available", hasClass("androidx.media3.exoplayer.ExoPlayer"))
-        result.put("composeAvailable", hasClass("androidx.compose.ui.platform.ComposeView"))
-        result.put("attached", available && runCatching { overlay.isAttached }.getOrDefault(false))
+        result.put("media3Available", hasPlayerClass("androidx.media3.exoplayer.ExoPlayer"))
+        result.put("composeAvailable", hasPlayerClass("androidx.compose.ui.platform.ComposeView"))
+        // overlayInstance, not the creating getter: asking "is it attached?"
+        // must not build an overlay to hear "no".
+        result.put("attached", overlayInstance?.isAttached == true)
         // Format modules are loaded reflectively at playback time, so their
         // absence is otherwise invisible until a stream fails to open.
-        result.put("hlsAvailable", hasClass("androidx.media3.exoplayer.hls.HlsMediaSource"))
-        result.put("dashAvailable", hasClass("androidx.media3.exoplayer.dash.DashMediaSource"))
+        result.put("hlsAvailable", hasPlayerClass("androidx.media3.exoplayer.hls.HlsMediaSource"))
+        result.put("dashAvailable", hasPlayerClass("androidx.media3.exoplayer.dash.DashMediaSource"))
         result.put(
             "pipSupported",
             available && runCatching { overlay.pipSupported }.getOrDefault(false),
         )
         // Reported separately from pipSupported so a host can tell "this device
         // cannot do PiP" apart from "you did not add the dependency".
-        result.put("corePipAvailable", hasClass("androidx.core.pip.VideoPlaybackPictureInPicture"))
+        result.put("corePipAvailable", hasPlayerClass("androidx.core.pip.VideoPlaybackPictureInPicture"))
         result.put(
             "media3UiComposeAvailable",
-            hasClass("androidx.media3.ui.compose.modifiers.ExtensionsKt"),
+            hasPlayerClass("androidx.media3.ui.compose.modifiers.ExtensionsKt"),
         )
         call.resolve(result)
     }
@@ -158,16 +172,20 @@ open class PipePlayerPlugin : Plugin() {
         Log.i(TAG, "dock css=($x,$y,${width}x$height) dpr=$density")
 
         activity.runOnUiThread {
-            overlay.attach()
-            overlay.dock(
-                RectF(
-                    x * density,
-                    y * density,
-                    (x + width) * density,
-                    (y + height) * density,
-                ),
-            )
-            call.resolve()
+            // attach() throws on a host with no content view; a crash inside
+            // runOnUiThread takes the app down, a rejection tells the caller.
+            runCatching {
+                overlay.attach()
+                overlay.dock(
+                    RectF(
+                        x * density,
+                        y * density,
+                        (x + width) * density,
+                        (y + height) * density,
+                    ),
+                )
+            }.onSuccess { call.resolve() }
+                .onFailure { call.reject("could not attach player: ${it.message}") }
         }
     }
 
@@ -190,9 +208,14 @@ open class PipePlayerPlugin : Plugin() {
     fun setFullscreen(call: PluginCall) {
         if (rejectIfUnavailable(call)) return
         val fullscreen = call.getBoolean("fullscreen", true) ?: true
-        activity.runOnUiThread {
-            scope.launch {
+        // AndroidUiDispatcher.Main already lands on the main thread — the old
+        // runOnUiThread wrapper around this launch was a second hop for
+        // nothing. The finally keeps the bridge call from dangling forever if
+        // the scope dies mid-animation.
+        scope.launch {
+            try {
                 overlay.setFullscreen(fullscreen)
+            } finally {
                 call.resolve()
             }
         }
@@ -214,9 +237,17 @@ open class PipePlayerPlugin : Plugin() {
         val showPreviousNext = call.getBoolean("showPreviousNext")
         val title = call.getString("title")
 
-        // Exactly one custom slot. The top row is speed, quality, then yours —
-        // a variable number of consumer buttons would push the fixed ones around
-        // and cost them their stable position.
+        /*
+         * Exactly one custom slot. The top row is speed, quality, then yours —
+         * a variable number of consumer buttons would push the fixed ones
+         * around and cost them their stable position.
+         *
+         * Presence and value travel separately: a `button` key that is present
+         * but unparsable (or null) REMOVES the button, while a configure call
+         * that never mentions `button` leaves an existing one alone — the same
+         * keep-current contract every other field has.
+         */
+        val buttonProvided = call.data.has("button")
         val button = call.getObject("button", null)?.let { item ->
             val id = item.optString("id").takeIf { it.isNotEmpty() }
             val icon = item.optString("icon").takeIf { it.isNotEmpty() }
@@ -229,25 +260,33 @@ open class PipePlayerPlugin : Plugin() {
         val pip = call.getBoolean("pip")
         val secure = call.getBoolean("secure")
 
-        /*
-         * Mini geometry. Absent keys keep their current value rather than
-         * resetting to the default, so a host can adjust one padding without
-         * restating the whole block.
-         */
-        val miniOptions = call.getObject("mini", null)?.let { item ->
-            val current = PipePlayerMiniConfig()
-            PipePlayerMiniConfig(
-                width = item.optDouble("width", current.width.toDouble()).toFloat(),
-                corner = PipePlayerCorner.parse(item.optString("corner")),
-                paddingLeft = item.optDouble("paddingLeft", current.paddingLeft.toDouble()).toFloat(),
-                paddingTop = item.optDouble("paddingTop", current.paddingTop.toDouble()).toFloat(),
-                paddingRight = item.optDouble("paddingRight", current.paddingRight.toDouble()).toFloat(),
-                paddingBottom = item.optDouble("paddingBottom", current.paddingBottom.toDouble()).toFloat(),
-                draggable = item.optBoolean("draggable", current.draggable),
-            )
-        }
+        val miniObject = call.getObject("mini", null)
 
         activity.runOnUiThread {
+            /*
+             * Mini geometry merges onto the LIVE config, not a fresh default.
+             * Absent keys keep their current value, so a host can adjust one
+             * padding without restating the whole block — seeded from a
+             * default, `{mini:{paddingBottom:80}}` silently reset the width
+             * and corner it never mentioned.
+             */
+            val miniOptions = miniObject?.let { item ->
+                val current = overlay.currentMiniConfig
+                PipePlayerMiniConfig(
+                    width = item.optDouble("width", current.width.toDouble()).toFloat(),
+                    corner = if (item.has("corner")) {
+                        PipePlayerCorner.parse(item.optString("corner"))
+                    } else {
+                        current.corner
+                    },
+                    paddingLeft = item.optDouble("paddingLeft", current.paddingLeft.toDouble()).toFloat(),
+                    paddingTop = item.optDouble("paddingTop", current.paddingTop.toDouble()).toFloat(),
+                    paddingRight = item.optDouble("paddingRight", current.paddingRight.toDouble()).toFloat(),
+                    paddingBottom = item.optDouble("paddingBottom", current.paddingBottom.toDouble()).toFloat(),
+                    draggable = item.optBoolean("draggable", current.draggable),
+                )
+            }
+
             pip?.let { overlay.setPipEnabled(it) }
             secure?.let { overlay.setSecure(it) }
             overlay.configure(
@@ -261,6 +300,7 @@ open class PipePlayerPlugin : Plugin() {
                 speeds = sheetOptions(call, "speeds"),
                 qualities = sheetOptions(call, "qualities"),
                 extraButton = button,
+                extraButtonProvided = buttonProvided,
             )
             call.resolve()
         }
@@ -309,9 +349,11 @@ open class PipePlayerPlugin : Plugin() {
             return
         }
         activity.runOnUiThread {
-            overlay.attach()
-            overlay.load(url)
-            call.resolve()
+            runCatching {
+                overlay.attach()
+                overlay.load(url)
+            }.onSuccess { call.resolve() }
+                .onFailure { call.reject("could not attach player: ${it.message}") }
         }
     }
 
@@ -365,17 +407,9 @@ open class PipePlayerPlugin : Plugin() {
          * within the player.
          */
         val available: Boolean by lazy {
-            hasClass("androidx.media3.exoplayer.ExoPlayer") &&
-                hasClass("androidx.compose.ui.platform.ComposeView") &&
-                hasClass("androidx.media3.ui.compose.modifiers.ExtensionsKt")
+            hasPlayerClass("androidx.media3.exoplayer.ExoPlayer") &&
+                hasPlayerClass("androidx.compose.ui.platform.ComposeView") &&
+                hasPlayerClass("androidx.media3.ui.compose.modifiers.ExtensionsKt")
         }
-
-        fun hasClass(name: String): Boolean =
-            try {
-                Class.forName(name)
-                true
-            } catch (ignored: Throwable) {
-                false
-            }
     }
 }
