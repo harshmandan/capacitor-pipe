@@ -107,6 +107,37 @@ Media3 is an **optional** dependency. Apps without it are unaffected and use the
 loopback manifest instead. Check `getEngineStatus().media3Available` before
 calling into this path.
 
+## The player
+
+**Required contract: every page that shows the player must `dock()` on mount and
+`undock()` on unmount.**
+
+The player is a native overlay on the Activity, not an element in your page. It
+outlives web navigation — that is the point — so a rect measured on one page is
+meaningless on the next. Pages *lend* the player a rectangle; they do not own it.
+
+```js
+// on mount
+const r = stage.getBoundingClientRect();
+await PipePlayer.dock({ x: r.x, y: r.y, w: r.width, h: r.height, dpr: devicePixelRatio });
+// on unmount — the video keeps playing, it just has nowhere to sit
+await PipePlayer.undock();
+// and on resize/orientation change, dock() again with fresh numbers
+```
+
+Skip it and the failure is quiet rather than loud: minimise on page A, navigate
+to page B, press expand, and there is no rect to expand into. The player stays in
+the corner and emits `expandUnavailable` — listen for it and route back to the
+page that owns the video, the way YouTube does.
+
+The package also ships an optional native player — a separate Capacitor plugin
+with its own API, dependencies and docs. It handles the docked ⟷ fullscreen
+transform, a corner mini player, Picture-in-Picture, live streams and gestures.
+
+See **[PLAYER.md](PLAYER.md)** for setup, the manifest changes PiP needs, and
+the full API. Apps that only extract can ignore it entirely and ship none of its
+dependencies.
+
 ## Licence
 
 GPL-3.0-or-later. Both extractors are GPL-3.0 and this plugin links against

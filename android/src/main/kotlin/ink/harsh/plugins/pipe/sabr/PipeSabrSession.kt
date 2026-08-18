@@ -27,19 +27,8 @@ class PipeSabrSession internal constructor(
      */
     internal fun close() {
         bridge.stop()
-        deleteRecursively(spoolDirectory)
-    }
-
-    companion object {
-        private fun deleteRecursively(file: File) {
-            val children = file.listFiles()
-            if (children != null) {
-                for (child in children) {
-                    deleteRecursively(child)
-                }
-            }
-            // Best effort: a segment still being streamed may briefly hold a handle.
-            file.delete()
-        }
+        // kotlin.io's, replacing a hand-written copy of it. Best effort either
+        // way: a segment still being streamed may briefly hold a handle.
+        spoolDirectory.deleteRecursively()
     }
 }

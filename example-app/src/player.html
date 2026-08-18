@@ -29,6 +29,12 @@
         aspect-ratio: 16 / 9;
         background: #1c1c22;
         border: 1px dashed #3a3a44;
+        /*
+         * 8px, and note it does NOT round the video. The player is a native view
+         * composited over the WebView, so host CSS cannot clip it — verified by
+         * raising this to 28px with overflow:hidden and seeing square corners.
+         * Rounding the player is a native-side change; see PipePlayerSurface.
+         */
         border-radius: 8px;
         display: grid;
         place-items: center;
@@ -91,6 +97,22 @@
       <button id="play">Play</button>
       <button id="pause">Pause</button>
       <button id="release">Release</button>
+    </div>
+    <div class="row">
+      <button id="fs">Fullscreen</button>
+      <button id="unfs">Exit FS</button>
+    </div>
+
+    <div class="row">
+      <button id="mini">Mini</button>
+      <button id="unmini">Restore</button>
+      <button id="pip">Enter PiP</button>
+      <button id="secure">Secure on</button>
+      <button id="unsecure">Secure off</button>
+    </div>
+
+    <div class="row">
+      <button id="live">Load LIVE stream</button>
     </div>
 
     <pre id="log">ready</pre>

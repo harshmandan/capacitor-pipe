@@ -85,7 +85,8 @@ class PipeSabrManager(context: Context, private val engine: PipePipeEngine) {
         } catch (e: Throwable) {
             // Never leave a half-open session holding a spool directory.
             bridge.stop()
-            deleteRecursively(spool)
+            // kotlin.io's, replacing a hand-written copy of it.
+            spool.deleteRecursively()
             throw e
         }
     }
@@ -136,14 +137,5 @@ class PipeSabrManager(context: Context, private val engine: PipePipeEngine) {
         @JvmStatic
         fun lookup(sessionId: String): PipeSabrSession? = ALL_SESSIONS[sessionId]
 
-        private fun deleteRecursively(file: File) {
-            val children = file.listFiles()
-            if (children != null) {
-                for (child in children) {
-                    deleteRecursively(child)
-                }
-            }
-            file.delete()
-        }
     }
 }

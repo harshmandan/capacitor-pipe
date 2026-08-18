@@ -212,16 +212,9 @@ class PipeWebViewRuntime private constructor(context: Context) {
 
     fun loadAsset(path: String): String {
         try {
-            appContext.assets.open(path).use { input ->
-                ByteArrayOutputStream().use { out ->
-                    val buffer = ByteArray(8192)
-                    var read: Int
-                    while (input.read(buffer).also { read = it } != -1) {
-                        out.write(buffer, 0, read)
-                    }
-                    return out.toString(StandardCharsets.UTF_8.name())
-                }
-            }
+            // kotlin.io, replacing a hand-written buffer loop. Same UTF-8
+            // decode, minus the deprecated charset-name overload of toString.
+            return appContext.assets.open(path).bufferedReader().use { it.readText() }
         } catch (e: Exception) {
             throw IllegalStateException("Could not load asset $path", e)
         }

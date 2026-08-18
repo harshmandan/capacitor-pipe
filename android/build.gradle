@@ -12,6 +12,10 @@ ext {
     okhttpVersion = '5.4.0'         // must match PipePipeExtractor — it leaks okhttp3.Call
     media3Version = '1.9.0'
     composeBomVersion = '2026.06.01'
+    windowVersion = '1.5.1'
+    corePipVersion = '1.0.0-alpha02'
+    // core-pip needs this; Capacitor's graph otherwise settles on 1.15.0.
+    corePipCoreVersion = '1.18.0'
 }
 
 buildscript {
@@ -106,6 +110,22 @@ repositories {
     maven { url 'https://jitpack.io' }
 }
 
+/*
+ * AGP keeps the compile and runtime classpaths on matching versions
+ * ("consistent resolution"), and a compileOnly dependency is by definition
+ * absent from runtime — so the runtime graph pinned androidx.core to Capacitor's
+ * 1.15.0 and then refused the 1.18.0 core-pip needs at compile time.
+ *
+ * Raising it on the COMPILE classpath only keeps the published artifact honest:
+ * we compile against the API core-pip requires without forcing an androidx.core
+ * upgrade onto consumers who never take the PiP dependency.
+ */
+configurations.configureEach {
+    if (name.toLowerCase().endsWith('compileclasspath')) {
+        resolutionStrategy.force "androidx.core:core:$corePipCoreVersion"
+    }
+}
+
 dependencies {
     /*
      * Both extraction engines, built from the pinned submodules by
@@ -172,6 +192,70 @@ dependencies {
     compileOnly "androidx.media3:media3-exoplayer:$media3Version"
     compileOnly "androidx.media3:media3-exoplayer-dash:$media3Version"
     compileOnly "androidx.media3:media3-datasource:$media3Version"
+    /*
+     * HLS, for live.
+     *
+     * Nothing here references it by name — DefaultMediaSourceFactory loads the
+     * format modules REFLECTIVELY from the URI's extension — which is precisely
+     * why its absence was invisible. An .m3u8 compiled and installed perfectly
+     * and then threw at playback time, so "does the player support live?" had
+     * the answer "the chrome does, the pipeline does not".
+     *
+     * compileOnly like the rest, so the consuming app must declare it too;
+     * `getPlayerStatus` reports whether it actually made it onto the classpath.
+     */
+    compileOnly "androidx.media3:media3-exoplayer-hls:$media3Version"
+
+    /*
+     * The video-sizing modifier, replacing hand-written letterbox arithmetic.
+     *
+     * A SEPARATE artifact from media3-ui, and the distinction matters: the note
+     * below about avoiding media3-ui is about PlayerView bundling a controller
+     * we would have to disable. media3-ui-compose contains no PlayerView and no
+     * PlayerControlView at all — only PlayerSurface, small state holders and
+     * this modifier. Taking it drags in no controller.
+     *
+     * Verified: minSdk 23, minCompileSdk 35, minAGP 1.0.0.
+     */
+    compileOnly "androidx.media3:media3-ui-compose:$media3Version"
+
+    /*
+     * Picture-in-Picture, via the Jetpack library rather than the platform API.
+     *
+     * The hand-rolled platform version did not work: it entered PiP and then
+     * showed the host's web page, because the mode-change callback it waited on
+     * never arrives on Android 17. core-pip owns that problem, plus the
+     * auto-enter/onUserLeaveHint version fork and sourceRectHint tracking.
+     *
+     * Alpha, and pinned deliberately — the API is not frozen, and the published
+     * guide already lags the artifact (docs say alpha02, latest is alpha03).
+     * compileOnly like everything else the player needs, so the alpha never
+     * reaches an app that did not ask for PiP; getPlayerStatus reports whether
+     * it is actually on the classpath.
+     *
+     * minSdk 23, below ours. PiP itself is API 26+ on handhelds regardless.
+     */
+    /*
+     * Window metrics, replacing a hand-written Build.VERSION fork.
+     *
+     * Not cosmetic: the old pre-API-30 branch read `resources.displayMetrics`,
+     * which excludes the navigation bar on most devices — so it under-reported
+     * height on API 24-29, the exact versions the fork existed to serve. That is
+     * the same class of bug as Gotcha 15. WindowMetricsCalculator's own fallback
+     * goes through Display.getRealSize instead.
+     *
+     * Verified: minSdk 23, minCompileSdk 34, minAGP 8.1.1 — inside our budget.
+     */
+    compileOnly "androidx.window:window:$windowVersion"
+
+    compileOnly "androidx.core:core-pip:$corePipVersion"
+    /*
+     * core-pip declares this at RUNTIME scope, so it is absent from the compile
+     * classpath and `PictureInPictureProvider` / `PictureInPictureParamsCompat`
+     * do not resolve without naming it here. Capacitor drags in an older
+     * androidx.core, which is why it has to be pinned rather than inherited.
+     */
+    compileOnly "androidx.core:core:$corePipCoreVersion"
 
     /*
      * The player module is optional on the same terms as Media3: an app that
@@ -185,12 +269,22 @@ dependencies {
     compileOnly platform("androidx.compose:compose-bom:$composeBomVersion")
     compileOnly 'androidx.compose.ui:ui'
     compileOnly 'androidx.compose.foundation:foundation'
+    // Material icons only — NOT material/material3. The player draws its own
+    // chrome; all we want is the standard glyph set so the controls look like
+    // Android rather than like hand-rolled paths.
+    compileOnly 'androidx.compose.material:material-icons-extended'
+    // material3 for ModalBottomSheet only. The player draws its own chrome, but
+    // a sheet needs real drag-to-dismiss, scrim and predictive-back behaviour —
+    // reimplementing that badly is worse than taking the dependency.
+    compileOnly 'androidx.compose.material3:material3'
     compileOnly 'androidx.activity:activity-compose:1.12.4'
     compileOnly 'androidx.dynamicanimation:dynamicanimation:1.1.0'
 
     androidTestImplementation platform("androidx.compose:compose-bom:$composeBomVersion")
     androidTestImplementation 'androidx.compose.ui:ui'
     androidTestImplementation 'androidx.compose.foundation:foundation'
+    androidTestImplementation 'androidx.compose.material:material-icons-extended'
+    androidTestImplementation 'androidx.compose.material3:material3'
     androidTestImplementation 'androidx.activity:activity-compose:1.12.4'
     androidTestImplementation 'androidx.dynamicanimation:dynamicanimation:1.1.0'
 

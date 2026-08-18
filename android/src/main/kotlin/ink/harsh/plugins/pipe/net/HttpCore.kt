@@ -171,11 +171,21 @@ object HttpCore {
     @Throws(IOException::class)
     fun toResult(response: Response): Result {
         response.use { closeable ->
-            val responseHeaders = closeable.headers
-            val mapped = HashMap<String, List<String>>()
-            for (name in responseHeaders.names()) {
-                mapped[name] = responseHeaders.values(name)
-            }
+            /*
+             * toMultimap(), not a hand-built HashMap — and this fixes a real bug.
+             *
+             * okhttp returns a case-INSENSITIVE TreeMap with lowercased keys.
+             * The hand-built map was case-SENSITIVE and kept the server's
+             * casing, and the extractors look headers up by literal string:
+             * `responseHeaders().get("set-cookie")` in two places and
+             * `get("Set-Cookie")` in a third. Only one of those spellings could
+             * ever match, so one lookup was always silently returning null.
+             *
+             * Safe to lowercase: neither fork iterates the key set — verified by
+             * grepping both submodules for keySet/entrySet/containsKey on this
+             * map, which returns nothing.
+             */
+            val mapped = closeable.headers.toMultimap()
 
             val bytes = closeable.body.bytes()
 

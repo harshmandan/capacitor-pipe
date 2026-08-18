@@ -355,6 +355,162 @@ is a superproject whose `PipePipeClient` submodule points at
 mirror 404s. Useful files there: `player/datasource/Sabr*.java`,
 `youtube/LocalDomPoTokenProvider.kt`, `assets/sabr_po_token.js`.
 
+### 15. `displayMetrics` is not the overlay's coordinate space
+
+The player overlay is a square centred in the Activity's **content view**. A dock
+rect arrives from `getBoundingClientRect`, so it is in **WebView** coordinates.
+The fullscreen target is in **display** coordinates. Three spaces, and system
+bars inset some of them and not others.
+
+Deriving the origin from `displayMetrics` conflated all three and produced two
+bugs that looked unrelated: the docked video drew about half the system-bar
+height too high, and fullscreen was centred on the content view instead of the
+screen. The arithmetic fix is a trap — it has to know whether the host is
+edge-to-edge, whether it opted out of Android 15's enforcement, and which bars
+are hidden right now.
+
+`PipePlayerOverlay.measureGeometry` therefore measures all of it with
+`getLocationOnScreen` on every layout pass and publishes a `PipePlayerGeometry`.
+Never reintroduce a screen size captured once at attach: rotation, immersive
+mode and host resizes all invalidate it.
+
+Related: hiding the system bars is not enough to draw under them. While the
+decor still fits system windows the content view keeps its inset padding and
+**clips the overlay**, so fullscreen stops short no matter how large the video is
+sized. `setDecorFitsSystemWindows(window, false)` on the way in, and `true` on
+the way out so the host page is not left underneath the status bar.
+
+### 16. `detectTransformGestures` also eats single-finger drags
+
+It is documented as a pan/zoom/rotate detector, and the pan half responds to
+**one** pointer and consumes it. Dropped onto the video to add pinch zoom, it
+silently swallowed the vertical drag that moves the player between docked and
+fullscreen. Nothing failed, nothing logged — the gesture simply stopped
+existing.
+
+The pinch handler is hand-rolled with `awaitEachGesture` and ignores every event
+until at least two pointers are down, so one-finger gestures are never touched.
+Same hazard applies to `detectDragGestures` layered over a tap detector.
+
+### 17. A `ModalBottomSheet` cannot be rotated by its parent
+
+It renders in its **own window**, not in your composable tree, so wrapping it in
+a rotated `graphicsLayer` does nothing at all. During the fake-rotated
+fullscreen (portrait Activity, video turned 90°) that left an upright sheet over
+a sideways video.
+
+The fix is to make the Activity genuinely landscape when a sheet opens there —
+`PipePlayerOverlay.alignActivityWithVideo`. It is seamless because the surface
+only applies its own rotation while the Activity is portrait, so the fake
+rotation switches off in the same frame the real one arrives and the video does
+not move.
+
+Known limitation, not yet solved: the sheet's window does not inherit the
+immersive flags, so the system bars reappear while a sheet is open in
+fullscreen.
+
+### 18. `SCREEN_ORIENTATION_SENSOR_LANDSCAPE` rotates twice
+
+It lets the system choose either landscape, and it chooses the one it last used
+— so turning the phone left rotated the player right and then swung it 180°
+once the sensor caught up.
+
+Name the exact constant. The two scales are mirrored, which is the easy thing to
+get backwards: `OrientationEventListener` reports how far the **device** has
+turned clockwise from natural, while the `ActivityInfo` constants name where the
+**content** ends up. A device at 90° wants `REVERSE_LANDSCAPE`, at 270°
+`LANDSCAPE`.
+
+### 19. core-pip is pinned to alpha02, and the pin is load-bearing
+
+Picture-in-Picture uses `androidx.core:core-pip`, not the platform API. The
+hand-rolled version entered PiP and then rendered the host's web page: on
+Android 17 the mode-change callback it waited on never arrives, because the
+Activity-recreation defaults changed.
+
+**Do not bump it to alpha03.** Its AAR metadata declares `minCompileSdk=37` and
+`minAndroidGradlePluginVersion=9.1.0`, and AGP enforces both — a hard build
+failure, not a warning. That is exactly the AGP 9 requirement Gotcha 1 exists to
+keep off consumers. alpha01/alpha02 declare 36 and 8.9.1, which our build meets.
+
+The API also moved between those two releases, so a bump is not a version-number
+change: alpha03 added an `Executor` constructor parameter and an explicit
+`commit()`, without which the fluent setters only stage changes.
+
+`core-pip` needs `androidx.core:1.18.0`, declared at *runtime* scope, so it is
+absent from the compile classpath. Capacitor's graph settles on 1.15.0 and AGP's
+consistent resolution then refuses 1.18.0 — hence the `resolutionStrategy.force`
+applied to compile classpaths only in `android/build.gradle`.
+
+### 20. A window does not always start at screen 0,0
+
+`getLocationOnScreen` is absolute, so deriving the window origin from it means
+subtracting the window's own position — `bounds.left/top`, not zero. Docked and
+fullscreen both report 0,0, so the assumption held everywhere until PiP, where
+it put the video's centre at a negative y: the frame was drawn entirely above
+the PiP window and the host's page showed through, looking exactly like the
+player ignoring PiP.
+
+### 21. `Size.Unspecified` crashes `resizeWithContentScale`
+
+`Size.Unspecified` is `Size(NaN, NaN)`, and Media3's `resizeWithContentScale`
+rounds the dimensions it computes — so passing it kills the frame with
+`IllegalArgumentException: Cannot round NaN value`, from inside the library.
+
+Media3's own samples never hit it because they withhold the surface until a
+video size is known; `PresentationState.coverSurface` exists for exactly that.
+We cannot, because the TextureView must exist for ExoPlayer to attach to and for
+core-pip's `setPlayerView` to track. So before the first frame reports a size,
+pass the **box's own aspect** — `Fit` then becomes a no-op and the video fills
+the box, which is what the hand-written arithmetic did in that case.
+
+Related, on the same artifact: `media3-ui-compose` is NOT `media3-ui`. The
+warning elsewhere about avoiding media3-ui is about `PlayerView` bundling a
+controller; `media3-ui-compose` contains no `PlayerView` and no
+`PlayerControlView` — only `PlayerSurface`, state holders and this modifier. We
+take the modifier but keep our own TextureView, because `PlayerSurface` owns its
+view internally and core-pip needs a handle to ours.
+
+### 22. A gesture inside `graphicsLayer` reads rotated coordinates
+
+Swipe-down-to-exit-fullscreen was reported broken three times, and two plausible
+causes were fixed before the real one was found. It was placement: the drag
+modifier sat **after** `graphicsLayer { rotationZ = 90f }` in the chain, so it
+ran in the box's local space. At 90° a screen-vertical swipe is *horizontal*
+there — `Orientation.Vertical` never passed touch slop, and the gesture silently
+did not exist. Dragging *into* fullscreen always worked, because at p = 0 there
+is no rotation, which is what made it look like an exit-only bug.
+
+Pointer coordinates are transformed by every layer between the gesture and the
+root. Put drag handling **before** any `graphicsLayer` that rotates.
+
+What actually found it: instrumenting the drag and seeing **zero** events. An
+empty log proves the gesture never arrived, which is a different bug from one
+that arrives and computes the wrong thing. Reach for that earlier.
+
+### 23. `travel` and `COMMIT_VELOCITY` are one setting with two names
+
+`PipePlayerSurface`'s `travel` converts finger pixels into progress units, and
+`PipePlayerMotion.COMMIT_VELOCITY` is the release speed that commits a flick —
+**in progress units**, i.e. already divided by `travel`.
+
+So lengthening `travel` to slow the drag down silently raises the real-world
+speed needed to flick. Going from ~486px to ~1333px made even a fast 1400px/s
+flick score 1.05 against a threshold of 1.2: velocity could never win, releases
+fell back to "did you pass halfway", and swipe-to-exit stopped working while the
+tracking it was meant to fix looked fine.
+
+Change one, recompute the other. And test with a SHORT flick: a long synthetic
+swipe commits on distance alone and hides exactly this failure.
+
+### 24. KDoc is Markdown, not Javadoc
+
+Six player files carried `<p>`, `<b>`, `<pre>` and `{@link}` — habits that came
+across with the ported Java sources. None of it renders: KDoc uses Markdown, so
+those tags show up literally in quick-docs and Dokka. Use blank lines, `**bold**`,
+fenced blocks and `[Symbol]` links. `@param` and `@return` are genuine KDoc tags
+and stay.
+
 ---
 
 # Architecture

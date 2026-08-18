@@ -3,9 +3,9 @@ package ink.harsh.plugins.pipe.media3
 import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.BaseDataSource
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
-import androidx.media3.datasource.TransferListener
 import ink.harsh.plugins.pipe.sabr.PipeSabrBridge
 import ink.harsh.plugins.pipe.sabr.PipeSabrSession
 import ink.harsh.plugins.pipe.sabr.PipeSabrSpec
@@ -31,7 +31,20 @@ import java.io.InputStream
  * against the base URI the manifest was parsed with.
  */
 @UnstableApi
-class PipeSabrDataSource internal constructor(private val session: PipeSabrSession) : DataSource {
+/*
+ * isNetwork = false, and that is not a detail.
+ *
+ * Extending BaseDataSource makes TransferListener callbacks fire, which is the
+ * point — until now `addTransferListener` was a no-op, so DefaultBandwidthMeter,
+ * EventLogger and any analytics saw zero bytes from this source. But these reads
+ * come off a local spool file at RAM speed. Counted as network transfer they
+ * would produce wildly optimistic estimates and push AdaptiveTrackSelection
+ * toward a rendition the actual SABR session cannot sustain. Declaring the
+ * source non-network keeps the listeners honest without poisoning ABR.
+ */
+class PipeSabrDataSource internal constructor(
+    private val session: PipeSabrSession,
+) : BaseDataSource(/* isNetwork = */ false) {
 
     private var uri: Uri? = null
     private var initializationData: ByteArray? = null
@@ -40,13 +53,10 @@ class PipeSabrDataSource internal constructor(private val session: PipeSabrSessi
     private var bytesRemaining: Long = 0
     private var position = 0
 
-    override fun addTransferListener(transferListener: TransferListener) {
-        // Transfers happen inside the SABR session, not through this DataSource,
-        // so there is nothing meaningful to report here.
-    }
 
     @Throws(IOException::class)
     override fun open(dataSpec: DataSpec): Long {
+        transferInitializing(dataSpec)
         uri = dataSpec.uri
         closeStream()
         initializationData = null
@@ -87,6 +97,7 @@ class PipeSabrDataSource internal constructor(private val session: PipeSabrSessi
         } else {
             Math.min(dataSpec.length, available)
         }
+        transferStarted(dataSpec)
         return bytesRemaining
     }
 
@@ -111,6 +122,7 @@ class PipeSabrDataSource internal constructor(private val session: PipeSabrSessi
             System.arraycopy(data, position, target, offset, count)
             position += count
             bytesRemaining -= count.toLong()
+            bytesTransferred(count)
             return count
         }
 
@@ -122,6 +134,7 @@ class PipeSabrDataSource internal constructor(private val session: PipeSabrSessi
         }
         position += count
         bytesRemaining -= count.toLong()
+        bytesTransferred(count)
         return count
     }
 
@@ -132,6 +145,7 @@ class PipeSabrDataSource internal constructor(private val session: PipeSabrSessi
         initializationData = null
         try {
             closeStream()
+            transferEnded()
         } finally {
             val key = openedKey
             openedKey = null

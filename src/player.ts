@@ -25,6 +25,168 @@ export interface PlayerStatus {
   composeAvailable: boolean;
   /** True once the overlay has been added to the host Activity. */
   attached: boolean;
+  /**
+   * Whether `media3-exoplayer-hls` is on the classpath.
+   *
+   * Worth checking before playing a live stream. Media3 loads format modules
+   * *reflectively* from the URL, so a missing one is invisible at build time
+   * and throws when the stream opens — an `.m3u8` will fail with this false.
+   */
+  hlsAvailable: boolean;
+  /** Whether `media3-exoplayer-dash` is present — needed for SABR manifests. */
+  dashAvailable: boolean;
+  /**
+   * Whether `media3-ui-compose` is present.
+   *
+   * **Required** for the player, not optional: the surface sizes the video with
+   * its `resizeWithContentScale`. `available` already accounts for it; this is
+   * here so a missing one is nameable rather than just "unavailable".
+   */
+  media3UiComposeAvailable: boolean;
+  /**
+   * Whether `androidx.core:core-pip` is on the classpath.
+   *
+   * Reported separately from `pipSupported` so you can tell "this device cannot
+   * do PiP" apart from "you did not add the dependency".
+   */
+  corePipAvailable: boolean;
+  /**
+   * Whether Picture-in-Picture could work on this device.
+   *
+   * Note this reports the OS and hardware only. It cannot see whether your
+   * Activity declares `android:supportsPictureInPicture`, so this being true
+   * is necessary but not sufficient — see `pip` in {@link PlayerConfig}.
+   */
+  pipSupported: boolean;
+}
+
+/**
+ * One row in the speed or quality sheet.
+ *
+ * The player presents these; it does not invent them. It has no way to know
+ * which quality levels your stream actually has.
+ */
+export interface PlayerOption {
+  id: string;
+  label: string;
+}
+
+/**
+ * A consumer-added control.
+ *
+ * It gets *our* button — same size, hit area and press feedback as the
+ * built-ins — with your glyph inside, so additions cannot look bolted on.
+ */
+export interface PlayerButton {
+  /** Returned in the `playerAction` event when tapped. */
+  id: string;
+  /**
+   * SVG path data on a 24x24 viewBox, e.g. `'M8 5v14l11-7z'`.
+   *
+   * A path rather than an image so the icon crosses the bridge as plain data
+   * and renders in our style at any density — no asset packaging, no bitmaps.
+   */
+  icon: string;
+}
+
+/**
+ * The player's entire styling surface.
+ *
+ * Deliberately this small. Layout, sizing, spacing, timing and behaviour are
+ * fixed: the interaction is the product, and a half-restyled version of it is
+ * worse than either extreme. If you need a different player, this is the wrong
+ * library.
+ */
+export interface PlayerConfig {
+  /** The one colour you control. Accepts `#RGB`, `#RRGGBB`, `#AARRGGBB`. */
+  accentColor?: string;
+  /** Show previous/next. Off unless the host actually has a queue. */
+  showPreviousNext?: boolean;
+  /** Shown in fullscreen only — docked, the host page already has it. */
+  title?: string;
+  /** Second line under the title, e.g. a channel name. Fullscreen only. */
+  subtitle?: string;
+  /**
+   * Current playback rate, shown on the speed button, e.g. `'1x'`.
+   *
+   * Displayed, not owned. The player surfaces the tap and you decide what a
+   * speed menu contains.
+   */
+  speedLabel?: string;
+  /** Current quality, shown on the quality button, e.g. `'720p'`. */
+  qualityLabel?: string;
+  /**
+   * Rows for the speed sheet. Plain strings are accepted as their own label.
+   *
+   * The player applies the speed itself and emits `speedSelected`.
+   */
+  speeds?: (PlayerOption | string)[];
+  /**
+   * Rows for the quality sheet.
+   *
+   * Unlike speed, the player *cannot* apply this — which track to use is an
+   * extraction decision, not a playback one. It emits `qualitySelected` and
+   * leaves you to reload at the chosen level.
+   */
+  qualities?: (PlayerOption | string)[];
+  /**
+   * Allow Picture-in-Picture. Off unless asked for.
+   *
+   * **This alone is not enough.** PiP shrinks the host's entire window, so the
+   * host must also declare it on its own Activity — a plugin's manifest cannot
+   * merge into an activity whose name it does not know:
+   *
+   * ```xml
+   * <activity
+   *     android:name=".MainActivity"
+   *     android:supportsPictureInPicture="true"
+   *     android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation" />
+   * ```
+   *
+   * It also needs `androidx.core:core-pip` on your classpath — check
+   * `corePipAvailable`. With both in place the system enters PiP by itself when
+   * the user leaves the app, on **every** supported version: the library reaches
+   * `onUserLeaveHint` through `ComponentActivity` on Android 8–11 and
+   * auto-enter on 12+, so there is nothing version-specific for you to write.
+   *
+   * Pin `core-pip` to `1.0.0-alpha02`. alpha03 requires AGP 9.1.0, which
+   * Capacitor 8 apps do not ship — see PLAYER.md.
+   */
+  pip?: boolean;
+  /**
+   * Block screenshots and screen recording (`FLAG_SECURE`).
+   *
+   * A **window** flag, not a view one, so it necessarily covers the host's page
+   * too — there is no way to secure only the video. It also blanks the recents
+   * thumbnail and the PiP window, and on some devices disables casting.
+   */
+  secure?: boolean;
+  /**
+   * One custom control, placed after speed and quality.
+   *
+   * Exactly one, deliberately: a variable number would shuffle the fixed
+   * buttons around and cost them their stable position.
+   */
+  button?: PlayerButton;
+}
+
+/** Emitted when a control the host owns is tapped. */
+export interface PlayerActionEvent {
+  /**
+   * One of:
+   *
+   * - `speed` / `quality` — the button was tapped and a sheet opened
+   * - `speedSelected` / `qualitySelected` — a row was chosen; `buttonId` is its id
+   * - `minimise` — shrunk to the corner; the player keeps playing
+   * - `expand` — left the corner window or PiP
+   * - `expandUnavailable` — expand was pressed with no rect claimed on this
+   *   page. Route back to the page that owns the video; see PLAYER.md.
+   * - `previous` / `next` — queue controls, if you enabled them
+   * - `button` — your custom control; `buttonId` is its id
+   */
+  action: string;
+  /** The id of the button or the selected row, depending on `action`. */
+  buttonId?: string;
 }
 
 export interface PipePlayerPlugin {
@@ -65,4 +227,41 @@ export interface PipePlayerPlugin {
 
   /** Tear down the player and remove the overlay. */
   release(): Promise<void>;
+
+  /** Apply the accent colour and the two extension points. */
+  configure(options: PlayerConfig): Promise<void>;
+
+  /** Animate to fullscreen or back. The swipe gesture is the primary route in. */
+  setFullscreen(options: { fullscreen: boolean }): Promise<void>;
+
+  /**
+   * Shrink to a corner window, or bring it back.
+   *
+   * The same player animates to the corner — it is not a second, smaller
+   * player — so playback is never interrupted. Combine with `undock()` when the
+   * host navigates away from the page that owned the rect.
+   */
+  setMini(options: { mini: boolean }): Promise<void>;
+
+  /**
+   * Enter Picture-in-Picture immediately.
+   *
+   * Requires `pip: true` and the manifest declaration described on
+   * {@link PlayerConfig.pip}; resolves `{ entered: false }` when either is
+   * missing or the device does not support PiP. On Android 12+ you usually do
+   * not need this — the system enters PiP on its own.
+   */
+  enterPip(): Promise<{ entered: boolean }>;
+
+  /**
+   * Controls the host owns rather than the player.
+   *
+   * Quality, speed and minimise are surfaced rather than implemented, because
+   * the player has no opinion about your quality list, your speed menu, or what
+   * minimising means in your layout.
+   */
+  addListener(
+    eventName: 'playerAction',
+    listener: (event: PlayerActionEvent) => void,
+  ): Promise<import('@capacitor/core').PluginListenerHandle>;
 }

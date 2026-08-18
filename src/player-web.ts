@@ -1,6 +1,6 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type { DockRect, PipePlayerPlugin, PlayerStatus } from './player';
+import type { DockRect, PipePlayerPlugin, PlayerConfig, PlayerStatus } from './player';
 
 const UNSUPPORTED =
   "capacitor-pipe's player is Android-only. On web, play the extracted stream URL " +
@@ -21,6 +21,11 @@ export class PipePlayerWeb extends WebPlugin implements PipePlayerPlugin {
       media3Available: false,
       composeAvailable: false,
       attached: false,
+      hlsAvailable: false,
+      dashAvailable: false,
+      media3UiComposeAvailable: false,
+      corePipAvailable: false,
+      pipSupported: false,
     };
   }
 
@@ -46,5 +51,23 @@ export class PipePlayerWeb extends WebPlugin implements PipePlayerPlugin {
 
   async release(): Promise<void> {
     throw this.unavailable(UNSUPPORTED);
+  }
+
+  async configure(_options: PlayerConfig): Promise<void> {
+    throw this.unavailable(UNSUPPORTED);
+  }
+
+  async setFullscreen(_options: { fullscreen: boolean }): Promise<void> {
+    throw this.unavailable(UNSUPPORTED);
+  }
+
+  async setMini(_options: { mini: boolean }): Promise<void> {
+    throw this.unavailable(UNSUPPORTED);
+  }
+
+  async enterPip(): Promise<{ entered: boolean }> {
+    // Reports rather than throws: PiP is an enhancement, so a host that asks
+    // for it on web should get a plain "no" instead of an exception to catch.
+    return { entered: false };
   }
 }

@@ -45,7 +45,7 @@
     "fmt": "npm run eslint -- --fix && npm run prettier -- --write",
     "eslint": "eslint . --ext ts",
     "prettier": "prettier \"**/*.{css,html,ts,js,java}\" --plugin=prettier-plugin-java",
-    "docgen": "docgen --api PipePlugin --output-readme README.md --output-json dist/docs.json",
+    "docgen": "docgen --api PipePlugin --output-readme README.md --output-json dist/docs.json && npm run docgen:player",
     "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.mjs",
     "clean": "rimraf ./dist",
     "watch": "tsc --watch",
@@ -53,7 +53,8 @@
     "extractors:build": "./scripts/build-extractors.sh",
     "extractors:update": "./scripts/update-extractors.sh",
     "extractors:check": "./scripts/check-divergences.sh",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "docgen:player": "docgen --api PipePlayerPlugin --output-readme PLAYER.md --output-json dist/docs-player.json"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.0",

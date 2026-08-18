@@ -6,7 +6,7 @@ import org.schabi.newpipe.extractor.services.youtube.sabr.exception.SabrProtocol
 /**
  * HTTP for the attestation flow.
  *
- * <p>Upstream reaches for PipePipeClient's `DownloaderImpl` singleton, which is
+ * Upstream reaches for PipePipeClient's `DownloaderImpl` singleton, which is
  * app-scoped state we do not have. These calls also must not go through the
  * extractor's `Downloader`: they are Google attestation endpoints, not YouTube
  * extraction, and the extractor's downloader applies YouTube cookies and
