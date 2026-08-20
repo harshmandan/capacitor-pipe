@@ -16,6 +16,16 @@ export interface DockRect {
   y: number;
   w: number;
   h: number;
+  /**
+   * The WebView's `devicePixelRatio`.
+   *
+   * These numbers are CSS pixels and the player draws in device pixels, so
+   * something has to supply the ratio between them. Optional, and Android's
+   * `displayMetrics.density` stands in when it is absent — but the two do not
+   * always agree, and where they disagree the video lands short of the rect the
+   * host reserved. Send it.
+   */
+  dpr?: number;
 }
 
 export interface PlayerStatus {
