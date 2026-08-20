@@ -56,6 +56,23 @@ import androidx.media3.exoplayer.ExoPlayer
  * only translates the video, and the switch itself happens behind the shutter,
  * carried by a real orientation change (CLAUDE.md Gotcha 24).
  */
+/**
+ * Where playback has got to, as a host sees it.
+ *
+ * Everything a progress record needs and nothing a host would have to shadow:
+ * the position to resume from, the duration to divide by, and enough state to
+ * tell "paused at 40%" apart from "finished". Live streams report
+ * [durationMs] as 0, because a live stream has none.
+ */
+data class PipePlaybackPosition(
+    val positionMs: Long,
+    val durationMs: Long,
+    val bufferedMs: Long,
+    val playing: Boolean,
+    val ended: Boolean,
+    val live: Boolean,
+)
+
 @UnstableApi
 class PipePlayerOverlay(private val activity: Activity) {
 
@@ -78,6 +95,25 @@ class PipePlayerOverlay(private val activity: Activity) {
         const val STABLE_QUIET_MS = 40L
         const val STABLE_POLL_MS = 16L
         const val STABLE_TIMEOUT_MS = 400L
+
+        /**
+         * How far playback advances between two position events.
+         *
+         * A second is the granularity a stored resume point is worth: finer
+         * costs bridge crossings nobody reads, coarser loses the last few
+         * seconds of a video that was closed rather than paused.
+         */
+        const val POSITION_EVERY_MS = 1_000L
+
+        /**
+         * A position change this large did not come from playing.
+         *
+         * The sampler runs every 250ms, so ordinary playback moves the position
+         * by about that much — anything beyond a second is a seek, a
+         * double-tap skip or a scrub, and a host storing progress wants it at
+         * once rather than a second later.
+         */
+        const val SEEK_JUMP_MS = 1_000L
 
         /**
          * core-pip is compileOnly, so its absence is a normal state.
@@ -210,6 +246,17 @@ class PipePlayerOverlay(private val activity: Activity) {
     /** Raised when a consumer-supplied button, or quality/speed, is tapped. */
     var onChromeEvent: ((String, String?) -> Unit)? = null
 
+    /**
+     * Raised as playback moves, so a host can record where the viewer got to.
+     *
+     * Sampled rather than pushed — ExoPlayer has no position callback — and
+     * rate-limited to roughly once a second while playing, plus immediately
+     * whenever something a host would want to react to changes: play, pause,
+     * end, a seek, or the duration becoming known. A host that stores progress
+     * writes on the event and needs no timer of its own.
+     */
+    var onPositionEvent: ((PipePlaybackPosition) -> Unit)? = null
+
     private var attached = false
 
     /**
@@ -230,6 +277,9 @@ class PipePlayerOverlay(private val activity: Activity) {
      */
     private var playerListener: Player.Listener? = null
     private var positionPoll: kotlinx.coroutines.Job? = null
+
+    /** The last snapshot handed to [onPositionEvent]; null until one is sent. */
+    private var lastEmitted: PipePlaybackPosition? = null
 
     val isAttached: Boolean get() = attached
 
@@ -314,10 +364,12 @@ class PipePlayerOverlay(private val activity: Activity) {
          * is how the leak read the first time.
          */
         positionPoll?.cancel()
+        lastEmitted = null
         positionPoll = uiScope.launch {
             while (true) {
                 positionMs.value = exo.currentPosition
                 bufferedMs.value = exo.bufferedPosition
+                emitPositionIfWorthIt()
                 delay(250)
             }
         }
@@ -484,6 +536,7 @@ class PipePlayerOverlay(private val activity: Activity) {
         if (!attached) return
         positionPoll?.cancel()
         positionPoll = null
+        lastEmitted = null
         playerListener?.let { listener -> player?.removeListener(listener) }
         playerListener = null
         sheetView?.let { view ->
@@ -1178,6 +1231,53 @@ class PipePlayerOverlay(private val activity: Activity) {
      * Shared by [load] and [loadOffline], so a change here must be checked
      * against both.
      */
+    /**
+     * The current snapshot, for a host that would rather ask than listen.
+     *
+     * Reads the sampled state rather than the player, so it is safe on any
+     * thread and cannot disagree with the last event a listener saw.
+     */
+    fun position(): PipePlaybackPosition =
+        PipePlaybackPosition(
+            positionMs = positionMs.value,
+            durationMs = durationMs.value,
+            bufferedMs = bufferedMs.value,
+            playing = playing.value,
+            ended = ended.value,
+            live = live.value,
+        )
+
+    /**
+     * Emit a position event, but only when it says something new.
+     *
+     * The sampler runs at 4 Hz because a scrubber needs that; a host storing
+     * progress does not, and four bridge crossings a second for the length of a
+     * lecture is a cost with no reader. So this emits about once a second while
+     * playing, and immediately when a host would want to react anyway: playback
+     * starting or stopping, the video ending, the duration becoming known, or a
+     * seek — which is the only way the position moves by more than a sample.
+     *
+     * A paused player emits nothing at all: nothing about it is changing, and
+     * the host already has the snapshot from the pause.
+     */
+    private fun emitPositionIfWorthIt() {
+        val listener = onPositionEvent ?: return
+        val now = position()
+        val previous = lastEmitted
+
+        val notable = previous == null ||
+            now.playing != previous.playing ||
+            now.ended != previous.ended ||
+            now.live != previous.live ||
+            now.durationMs != previous.durationMs ||
+            kotlin.math.abs(now.positionMs - previous.positionMs) >= SEEK_JUMP_MS ||
+            (now.playing && now.positionMs - previous.positionMs >= POSITION_EVERY_MS)
+
+        if (!notable) return
+        lastEmitted = now
+        listener(now)
+    }
+
     private fun resetForNewMedia() {
         ended.value = false
         videoAspect.value = 0f

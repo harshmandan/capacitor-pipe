@@ -1,6 +1,6 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type { DockRect, OfflineSource, PipePlayerPlugin, PlayerConfig, PlayerStatus } from './player';
+import type { DockRect, OfflineSource, PipePlayerPlugin, PlayerConfig, PlayerPosition, PlayerStatus } from './player';
 
 const UNSUPPORTED =
   "capacitor-pipe's player is Android-only. On web, play the extracted stream URL " +
@@ -40,6 +40,19 @@ export class PipePlayerWeb extends WebPlugin implements PipePlayerPlugin {
 
   async load(_options: { url?: string; offline?: OfflineSource; startPositionMs?: number }): Promise<void> {
     throw this.unavailable(UNSUPPORTED);
+  }
+
+  async getPosition(): Promise<PlayerPosition> {
+    // Reports rather than throws, like getPlayerStatus: a host asking where
+    // playback is on a platform with no player should read "nowhere".
+    return {
+      positionMs: 0,
+      durationMs: 0,
+      bufferedMs: 0,
+      playing: false,
+      ended: false,
+      live: false,
+    };
   }
 
   async play(): Promise<void> {

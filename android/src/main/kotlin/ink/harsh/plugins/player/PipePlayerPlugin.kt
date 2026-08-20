@@ -74,7 +74,26 @@ open class PipePlayerPlugin : Plugin() {
                     JSObject().put("action", action).put("buttonId", buttonId),
                 )
             }
+
+            /*
+             * Where playback has got to. The overlay decides when this is worth
+             * saying — roughly once a second while playing, and at once on a
+             * play, pause, seek or end — so the bridge carries progress rather
+             * than a 4 Hz sampler.
+             */
+            created.onPositionEvent = { position ->
+                notifyListeners("playerPosition", positionPayload(position))
+            }
         }
+
+    private fun positionPayload(position: PipePlaybackPosition): JSObject =
+        JSObject()
+            .put("positionMs", position.positionMs)
+            .put("durationMs", position.durationMs)
+            .put("bufferedMs", position.bufferedMs)
+            .put("playing", position.playing)
+            .put("ended", position.ended)
+            .put("live", position.live)
 
     /**
      * Options for a sheet, as `[{ id, label }]` or plain strings.
@@ -381,6 +400,26 @@ open class PipePlayerPlugin : Plugin() {
                 }
             }.onSuccess { call.resolve() }
                 .onFailure { call.reject("could not load: ${it.message}") }
+        }
+    }
+
+    /**
+     * Where playback is now, without waiting for the next event.
+     *
+     * The event stream is the normal way to follow a video; this is for the
+     * one-shot questions — the position to pass as `startPositionMs` when
+     * reloading at a different quality, or what to store as a page unmounts.
+     *
+     * Resolves zeroes when nothing is loaded rather than rejecting: "no video"
+     * is a state a host reads, not an error it handles.
+     */
+    @PluginMethod
+    fun getPosition(call: PluginCall) {
+        if (rejectIfUnavailable(call)) return
+        activity.runOnUiThread {
+            val snapshot = overlayInstance?.position()
+                ?: PipePlaybackPosition(0L, 0L, 0L, playing = false, ended = false, live = false)
+            call.resolve(positionPayload(snapshot))
         }
     }
 

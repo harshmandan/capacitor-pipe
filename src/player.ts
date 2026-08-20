@@ -243,6 +243,25 @@ export interface PlayerActionEvent {
   buttonId?: string;
 }
 
+/**
+ * Where playback has got to.
+ *
+ * Sampled rather than pushed — ExoPlayer has no position callback — and
+ * emitted about once a second while playing, plus immediately on a play,
+ * pause, seek, end, or the duration becoming known. A host that records
+ * progress writes on the event and needs no timer of its own.
+ */
+export interface PlayerPosition {
+  positionMs: number;
+  /** 0 when the duration is not yet known, and always 0 for a live stream. */
+  durationMs: number;
+  bufferedMs: number;
+  playing: boolean;
+  /** True once the video has run to its end. Cleared by the next `load()`. */
+  ended: boolean;
+  live: boolean;
+}
+
 export interface PipePlayerPlugin {
   /**
    * Whether the player can run in this app.
@@ -295,6 +314,16 @@ export interface PipePlayerPlugin {
 
   play(): Promise<void>;
 
+  /**
+   * Where playback is now, without waiting for the next event.
+   *
+   * For the one-shot questions the event stream answers awkwardly: the position
+   * to pass as `startPositionMs` when reloading at another quality, or what to
+   * store as a page unmounts. Resolves zeroes when nothing is loaded — "no
+   * video" is a state to read, not an error to handle.
+   */
+  getPosition(): Promise<PlayerPosition>;
+
   pause(): Promise<void>;
 
   /** Tear down the player and remove the overlay. */
@@ -335,5 +364,18 @@ export interface PipePlayerPlugin {
   addListener(
     eventName: 'playerAction',
     listener: (event: PlayerActionEvent) => void,
+  ): Promise<import('@capacitor/core').PluginListenerHandle>;
+
+  /**
+   * Follow playback position.
+   *
+   * The player owns the scrubber, so this is not for drawing one — it is for
+   * hosts that store progress: a resume point, a watched percentage, a
+   * completion. Roughly one event a second while playing and none at all while
+   * paused, so it can be written straight to a record.
+   */
+  addListener(
+    eventName: 'playerPosition',
+    listener: (event: PlayerPosition) => void,
   ): Promise<import('@capacitor/core').PluginListenerHandle>;
 }

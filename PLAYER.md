@@ -64,6 +64,29 @@ edge to play faster through, so the rate would climb, hit the edge and stall.
 Note the current scrubber treats live as "at the live edge" and does not model a
 DVR window — behind-the-edge playback shows a full bar.
 
+## Following playback
+
+The player draws its own scrubber, so a host never needs the position to render
+one. What a host does need is where the viewer got to — a resume point, a
+watched percentage, a completion — and that arrives as an event:
+
+```ts
+PipePlayer.addListener('playerPosition', ({ positionMs, durationMs, ended }) => {
+  if (!durationMs) return;                    // not known yet, or live
+  save({ positionMs, progress: (positionMs / durationMs) * 100, ended });
+});
+```
+
+Roughly one event a second while playing, none at all while paused, and one
+immediately on a play, a pause, a seek, an end, or the duration becoming known.
+So it can be written straight to a record without a timer, a throttle or a
+change check on the host side.
+
+`getPosition()` answers the same question once, for the moments an event stream
+suits badly: the `startPositionMs` for a reload at another quality, or a last
+write as a page unmounts. It resolves zeroes when nothing is loaded rather than
+rejecting.
+
 ## Offline files
 
 `load()` takes either a `url` or an `offline` source, never both and never
@@ -257,6 +280,7 @@ devices.
 * [`undock()`](#undock)
 * [`load(...)`](#load)
 * [`play()`](#play)
+* [`getPosition()`](#getposition)
 * [`pause()`](#pause)
 * [`release()`](#release)
 * [`configure(...)`](#configure)
@@ -264,6 +288,7 @@ devices.
 * [`setMini(...)`](#setmini)
 * [`enterPip()`](#enterpip)
 * [`addListener('playerAction', ...)`](#addlistenerplayeraction-)
+* [`addListener('playerPosition', ...)`](#addlistenerplayerposition-)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
 
@@ -354,6 +379,24 @@ would hide a broken download behind a data charge.
 ```typescript
 play() => any
 ```
+
+**Returns:** <code>any</code>
+
+--------------------
+
+
+### getPosition()
+
+```typescript
+getPosition() => any
+```
+
+Where playback is now, without waiting for the next event.
+
+For the one-shot questions the event stream answers awkwardly: the position
+to pass as `startPositionMs` when reloading at another quality, or what to
+store as a page unmounts. Resolves zeroes when nothing is loaded — "no
+video" is a state to read, not an error to handle.
 
 **Returns:** <code>any</code>
 
@@ -479,6 +522,29 @@ minimising means in your layout.
 --------------------
 
 
+### addListener('playerPosition', ...)
+
+```typescript
+addListener(eventName: 'playerPosition', listener: (event: PlayerPosition) => void) => any
+```
+
+Follow playback position.
+
+The player owns the scrubber, so this is not for drawing one — it is for
+hosts that store progress: a resume point, a watched percentage, a
+completion. Roughly one event a second while playing and none at all while
+paused, so it can be written straight to a record.
+
+| Param           | Type                                                                          |
+| --------------- | ----------------------------------------------------------------------------- |
+| **`eventName`** | <code>'playerPosition'</code>                                                 |
+| **`listener`**  | <code>(event: <a href="#playerposition">PlayerPosition</a>) =&gt; void</code> |
+
+**Returns:** <code>any</code>
+
+--------------------
+
+
 ### Interfaces
 
 
@@ -524,6 +590,25 @@ A rect in CSS pixels, as measured by the host's layout.
 | **`path`**     | <code>string</code>                                     | Absolute path to a local file. The player never guesses a directory.      |
 | **`mimeType`** | <code>string</code>                                     | Container hint, e.g. 'video/mp4'. Used only to tell the two tracks apart. |
 | **`cipher`**   | <code><a href="#offlinecipher">OfflineCipher</a></code> | Omit for a plaintext file.                                                |
+
+
+#### PlayerPosition
+
+Where playback has got to.
+
+Sampled rather than pushed — ExoPlayer has no position callback — and
+emitted about once a second while playing, plus immediately on a play,
+pause, seek, end, or the duration becoming known. A host that records
+progress writes on the event and needs no timer of its own.
+
+| Prop             | Type                 | Description                                                           |
+| ---------------- | -------------------- | --------------------------------------------------------------------- |
+| **`positionMs`** | <code>number</code>  |                                                                       |
+| **`durationMs`** | <code>number</code>  | 0 when the duration is not yet known, and always 0 for a live stream. |
+| **`bufferedMs`** | <code>number</code>  |                                                                       |
+| **`playing`**    | <code>boolean</code> |                                                                       |
+| **`ended`**      | <code>boolean</code> | True once the video has run to its end. Cleared by the next `load()`. |
+| **`live`**       | <code>boolean</code> |                                                                       |
 
 
 #### PlayerConfig
