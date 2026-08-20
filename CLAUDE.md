@@ -17,14 +17,14 @@ permissive licence header.
 
 ## The four documents, and which answers what
 
-| File                             | Answers                                                                                                                       |
-| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| this file                        | How to build it, and every trap in doing so.                                                                                  |
-| [DIVERGENCES.md](DIVERGENCES.md) | How the two engines differ **mechanically**. Checkable from source, and partly asserted by a script.                           |
-| [EXTRACTION.md](EXTRACTION.md)   | What **YouTube** was observed doing, when, and which decision followed. Dated, because the other party changes without asking. |
-| [PLAYER.md](PLAYER.md)           | The optional native player.                                                                                                   |
+| File                                     | Answers                                                                                                                        |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| this file                                | How to build it, and every trap in doing so.                                                                                   |
+| [DIVERGENCES.md](DIVERGENCES.md)         | How the two engines differ **mechanically**. Checkable from source, and partly asserted by a script.                           |
+| [docs/EXTRACTION.md](docs/EXTRACTION.md) | What **YouTube** was observed doing, when, and which decision followed. Dated, because the other party changes without asking. |
+| [PLAYER.md](PLAYER.md)                   | The optional native player.                                                                                                    |
 
-**A claim about YouTube's behaviour goes in EXTRACTION.md with a date and the
+**A claim about YouTube's behaviour goes in docs/EXTRACTION.md with a date and the
 measurement that produced it, or it is not evidence.** A claim about our own two
 dependencies goes in DIVERGENCES.md. Putting the first kind in a code comment is
 how a finding from last quarter comes to read as a law of nature.
@@ -96,7 +96,7 @@ npm run extractors:check     # assert the recorded divergences still hold
 **Whenever you write code that treats the two engines differently, add it to
 DIVERGENCES.md in the same change** — a new section, plus a check in
 `check-divergences.sh` if it can be asserted mechanically. This is not
-documentation housekeeping; several divergences fail *silently*. Section 10's
+documentation housekeeping; several divergences fail _silently_. Section 10's
 exception matching by simple name degrades into pointless retries with no error,
 no log and no failed build, and the only thing that catches it is the checker.
 
@@ -138,7 +138,7 @@ pattern-matching switch, and the only `getFirst`/`reversed` hits are
 `Pair.getFirst()` and `Comparator.reversed()` (Java 8), not
 `SequencedCollection`. All 559 classes compile clean to major 61.
 
-`scripts/verify-bytecode.sh` enforces this on every build. If you ever *do* need
+`scripts/verify-bytecode.sh` enforces this on every build. If you ever _do_ need
 JDK 25 semantics, compile with JDK 25 and set `options.release = 17` — same
 result, no AGP change anywhere.
 
@@ -179,7 +179,7 @@ touching the mappers:
 
 - `VideoStream` declares **public fields** `resolution` and `isVideoOnly`
   alongside an `isVideoOnly()` getter. Kotlin property syntax
-  (`stream.resolution`) binds to the deprecated *field*, not the getter. Call
+  (`stream.resolution`) binds to the deprecated _field_, not the getter. Call
   `getResolution()` / `isVideoOnly()` explicitly. These are the only shadowing
   fields in either fork — audited.
 - `String.split()` keeps trailing empty strings in Kotlin and drops them in
@@ -193,14 +193,14 @@ generify it.
 
 ### 3. Dependency collisions between the two forks
 
-| Dependency | PipePipe | NewPipe | Resolution |
-|---|---|---|---|
-| protobuf | `protobuf-java` (full) | `protobuf-javalite` | Collide on `com.google.protobuf.*`, not co-installable. NewPipe's is bundled + relocated. |
-| nanojson | commit `1d9e1aea` | commit `e9d656dd` | Same artifact, different pins. NewPipe's is bundled + relocated. |
-| jsoup | 1.22.2 | 1.22.2 | Identical — shared, not bundled. |
-| rhino | not used | 1.8.1 | NewPipe only. **Stay on 1.8.1** — 1.9.0 requires minSdk 26. |
-| okhttp | **5.4.0, in its public API** | test-only | PipePipe leaks okhttp into the `Downloader` contract: `CancellableCall(okhttp3.Call)`. Our PipePipe `Downloader` must return okhttp-backed calls, and the version must match what the extractor was compiled against. NewPipe has no such coupling. |
-| wire | 6.4.1, used | — | Needed at runtime (18 references). Must declare `wire-runtime`. |
+| Dependency | PipePipe                     | NewPipe             | Resolution                                                                                                                                                                                                                                          |
+| ---------- | ---------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| protobuf   | `protobuf-java` (full)       | `protobuf-javalite` | Collide on `com.google.protobuf.*`, not co-installable. NewPipe's is bundled + relocated.                                                                                                                                                           |
+| nanojson   | commit `1d9e1aea`            | commit `e9d656dd`   | Same artifact, different pins. NewPipe's is bundled + relocated.                                                                                                                                                                                    |
+| jsoup      | 1.22.2                       | 1.22.2              | Identical — shared, not bundled.                                                                                                                                                                                                                    |
+| rhino      | not used                     | 1.8.1               | NewPipe only. **Stay on 1.8.1** — 1.9.0 requires minSdk 26.                                                                                                                                                                                         |
+| okhttp     | **5.4.0, in its public API** | test-only           | PipePipe leaks okhttp into the `Downloader` contract: `CancellableCall(okhttp3.Call)`. Our PipePipe `Downloader` must return okhttp-backed calls, and the version must match what the extractor was compiled against. NewPipe has no such coupling. |
+| wire       | 6.4.1, used                  | —                   | Needed at runtime (18 references). Must declare `wire-runtime`.                                                                                                                                                                                     |
 
 ### 4. Capacitor 8 build requirements
 
@@ -252,7 +252,7 @@ is `visionos`, not `mweb`.
 state, so that two-pass sequence holds a lock and always restores the default.
 
 Historical note: PR #69 (which added SABR) shipped a `FORCE_SABR_FOR_TESTING`
-flag defaulting to `true`, routing *everything* through SABR. It has since been
+flag defaulting to `true`, routing _everything_ through SABR. It has since been
 removed, and our pin is well past it — but if you ever move the pin backwards,
 check for it.
 
@@ -324,7 +324,7 @@ whenever media arrives. **The token minted at session start does not last the
 whole session.**
 
 Never call `requestOnce` directly from the bridge. Note also that "progress"
-must be defined per call site: for a segment fetch it is *that* segment
+must be defined per call site: for a segment fetch it is _that_ segment
 arriving, since the server interleaves both tracks and a round advancing only
 the counterpart would otherwise look like success.
 
@@ -448,7 +448,7 @@ The API also moved between those two releases, so a bump is not a version-number
 change: alpha03 added an `Executor` constructor parameter and an explicit
 `commit()`, without which the fluent setters only stage changes.
 
-`core-pip` needs `androidx.core:1.18.0`, declared at *runtime* scope, so it is
+`core-pip` needs `androidx.core:1.18.0`, declared at _runtime_ scope, so it is
 absent from the compile classpath. Capacitor's graph settles on 1.15.0 and AGP's
 consistent resolution then refuses 1.18.0 — hence the `resolutionStrategy.force`
 applied to compile classpaths only in `android/build.gradle`.
@@ -487,9 +487,9 @@ view internally and core-pip needs a handle to ours.
 Swipe-down-to-exit-fullscreen was reported broken three times, and two plausible
 causes were fixed before the real one was found. It was placement: the drag
 modifier sat **after** `graphicsLayer { rotationZ = 90f }` in the chain, so it
-ran in the box's local space. At 90° a screen-vertical swipe is *horizontal*
+ran in the box's local space. At 90° a screen-vertical swipe is _horizontal_
 there — `Orientation.Vertical` never passed touch slop, and the gesture silently
-did not exist. Dragging *into* fullscreen always worked, because at p = 0 there
+did not exist. Dragging _into_ fullscreen always worked, because at p = 0 there
 is no rotation, which is what made it look like an exit-only bug.
 
 Pointer coordinates are transformed by every layer between the gesture and the
@@ -531,10 +531,10 @@ Rules that each cost a debugging round:
 - **Intent reads `motion.committed`; geometry reads the MEASURED window.**
   Bars, chrome layout and the orientation request hang off the committed latch
   (never `progress` — a drag past halfway must change nothing until release).
-  But the video's *rect* keys off `screenW > screenH`: keyed to `committed` it
+  But the video's _rect_ keys off `screenW > screenH`: keyed to `committed` it
   resized to fullscreen while the window was still portrait, and that one wrong
   frame was the only reason the shutter ever had to cover the video. Caveat
-  this inherits: a landscape-*shaped* docked window (tablet, DeX, desktop
+  this inherits: a landscape-_shaped_ docked window (tablet, DeX, desktop
   windowing) reads as fullscreen — acceptable for a portrait-locked phone host,
   wrong the day that assumption moves.
 - **One black layer, behind the video.** It hides the host's page and doubles as
@@ -556,7 +556,7 @@ Rules that each cost a debugging round:
   reading. Every programmatic `requestedOrientation` write syncs the listener's
   dedup via `noteRequested`, or it swallows and repeats requests unpredictably.
 
-Lowering the shutter waits for the switch to *begin* (configuration matches the
+Lowering the shutter waits for the switch to _begin_ (configuration matches the
 committed state) and then for the geometry to go quiet — never a fixed delay;
 the orientation change, window resize and the host's re-`dock()` land whenever
 they land. See `PipePlayerOverlay.awaitStableGeometry`, bounded so a host that
@@ -637,7 +637,7 @@ segment collector, the mp4/webm index parsers — is called, never copied.
 What the extractor deliberately will not do is turn segments into something
 playable. Per its own docs it "understands and drives the protocol; it does not
 mint tokens and does not render media." That client half lives in
-**PipePipeClient**, which cannot be a dependency: it is an Android *application*
+**PipePipeClient**, which cannot be a dependency: it is an Android _application_
 rather than a library, it is Codeberg-only, and its SABR layer is an ExoPlayer
 `DataSource`/`MediaSource` that a WebView cannot consume.
 

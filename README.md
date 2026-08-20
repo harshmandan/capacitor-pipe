@@ -25,7 +25,7 @@ import { Pipe } from 'capacitor-pipe';
 const result = await Pipe.extractStreamInfo({ videoUrl });
 
 if (result.success) {
-  console.log(result.engine);            // 'pipepipe' | 'newpipe'
+  console.log(result.engine); // 'pipepipe' | 'newpipe'
   console.log(result.streamInfo.title);
   console.log(result.streamInfo.videoStreams);
 }
@@ -45,11 +45,11 @@ before you render their output. See [DIVERGENCES.md](DIVERGENCES.md); the
 short version is that `dislikeCount`, `description` markup and SABR support all
 depend on which engine answered.
 
-They also differ in what YouTube *gives* them, which is not a property of this
+They also differ in what YouTube _gives_ them, which is not a property of this
 library and changes without notice. As of 2026-08-20 the primary engine gets no
 progressive stream at all for videos where the fallback gets 360p, so a consumer
 that wants a plain URL should ask the other engine before concluding there is
-none. [EXTRACTION.md](EXTRACTION.md) records that and every other dated
+none. [docs/EXTRACTION.md](docs/EXTRACTION.md) records that and every other dated
 observation, with how it was measured.
 
 Pass `sponsorBlock: true` to also fetch SponsorBlock segments
@@ -68,7 +68,7 @@ const { streamInfo } = await Pipe.extractStreamInfo({ videoUrl });
 
 if (streamInfo.requiresSabr) {
   const session = await Pipe.openSabrSession({ videoUrl });
-  videoElement.src = session.manifestUrl;   // a DASH manifest on 127.0.0.1
+  videoElement.src = session.manifestUrl; // a DASH manifest on 127.0.0.1
   // ...
   await Pipe.closeSabrSession({ sessionId: session.sessionId });
 }
@@ -154,7 +154,7 @@ calling into this path.
 
 The player is a native overlay on the Activity, not an element in your page. It
 outlives web navigation — that is the point — so a rect measured on one page is
-meaningless on the next. Pages *lend* the player a rectangle; they do not own it.
+meaningless on the next. Pages _lend_ the player a rectangle; they do not own it.
 
 ```js
 // on mount
@@ -187,13 +187,13 @@ them, so anything distributing it inherits GPL-3.0.
 
 <docgen-index>
 
-* [`extractStreamInfo(...)`](#extractstreaminfo)
-* [`openSabrSession(...)`](#opensabrsession)
-* [`closeSabrSession(...)`](#closesabrsession)
-* [`providePoToken(...)`](#providepotoken)
-* [`getEngineStatus()`](#getenginestatus)
-* [Interfaces](#interfaces)
-* [Type Aliases](#type-aliases)
+- [`extractStreamInfo(...)`](#extractstreaminfo)
+- [`openSabrSession(...)`](#opensabrsession)
+- [`closeSabrSession(...)`](#closesabrsession)
+- [`providePoToken(...)`](#providepotoken)
+- [`getEngineStatus()`](#getenginestatus)
+- [Interfaces](#interfaces)
+- [Type Aliases](#type-aliases)
 
 </docgen-index>
 
@@ -218,8 +218,7 @@ even when the call ultimately succeeds.
 
 **Returns:** <code>any</code>
 
---------------------
-
+---
 
 ### openSabrSession(...)
 
@@ -244,8 +243,7 @@ token this call fails.
 
 **Returns:** <code>any</code>
 
---------------------
-
+---
 
 ### closeSabrSession(...)
 
@@ -261,8 +259,7 @@ Tear down a SABR session and release its cache, tokens and loopback routes.
 
 **Returns:** <code>any</code>
 
---------------------
-
+---
 
 ### providePoToken(...)
 
@@ -291,8 +288,7 @@ unattested session.
 
 **Returns:** <code>any</code>
 
---------------------
-
+---
 
 ### getEngineStatus()
 
@@ -304,11 +300,9 @@ Report which engines and playback paths are available at runtime.
 
 **Returns:** <code>any</code>
 
---------------------
-
+---
 
 ### Interfaces
-
 
 #### ExtractStreamInfoOptions
 
@@ -320,7 +314,6 @@ Report which engines and playback paths are available at runtime.
 | **`localization`**   | <code>string</code>  | BCP-47 localisation, e.g. `en-GB`. Affects what YouTube returns, not just formatting.       |
 | **`contentCountry`** | <code>string</code>  | ISO-3166 country code. Affects availability and recommendations.                            |
 
-
 #### StreamInfoResult
 
 | Prop             | Type                                                          | Description                                                             |
@@ -330,7 +323,6 @@ Report which engines and playback paths are available at runtime.
 | **`engine`**     | <code><a href="#extractionengine">ExtractionEngine</a></code> | The engine that produced `streamInfo`. Absent when every engine failed. |
 | **`attempts`**   | <code>{}</code>                                               | Every engine tried, in order, including the ones that failed.           |
 | **`streamInfo`** | <code><a href="#streaminfo">StreamInfo</a></code>             |                                                                         |
-
 
 #### EngineAttempt
 
@@ -343,7 +335,6 @@ One engine's attempt at an extraction, successful or not.
 | **`error`**      | <code>string</code>                                           | Failure reason. Absent when `ok` is true.                                     |
 | **`errorType`**  | <code>string</code>                                           | Exception class name, useful for distinguishing age-gating from geo-blocking. |
 | **`durationMs`** | <code>number</code>                                           |                                                                               |
-
 
 #### StreamInfo
 
@@ -377,7 +368,6 @@ One engine's attempt at an extraction, successful or not.
 | **`sponsorBlockSegments`**    | <code>{}</code>                                   |                                                                                                                                                 |
 | **`requiresSabr`**            | <code>boolean</code>                              | True when YouTube served this video only over SABR, meaning the stream arrays contain no directly playable URL. Open a SABR session to play it. |
 
-
 #### Thumbnail
 
 | Prop                           | Type                                                  |
@@ -386,7 +376,6 @@ One engine's attempt at an extraction, successful or not.
 | **`width`**                    | <code>number</code>                                   |
 | **`height`**                   | <code>number</code>                                   |
 | **`estimatedResolutionLevel`** | <code>'HIGH' \| 'MEDIUM' \| 'LOW' \| 'UNKNOWN'</code> |
-
 
 #### VideoStream
 
@@ -398,7 +387,6 @@ One engine's attempt at an extraction, successful or not.
 | **`fps`**         | <code>number</code>  |                                                     |
 | **`isVideoOnly`** | <code>boolean</code> | True for adaptive video tracks that carry no audio. |
 
-
 #### AudioStream
 
 | Prop                 | Type                | Description                                     |
@@ -407,14 +395,12 @@ One engine's attempt at an extraction, successful or not.
 | **`audioTrackId`**   | <code>string</code> | Track id for multi-language audio, e.g. `en.4`. |
 | **`audioTrackName`** | <code>string</code> |                                                 |
 
-
 #### SubtitleStream
 
 | Prop                | Type                 | Description                                                     |
 | ------------------- | -------------------- | --------------------------------------------------------------- |
 | **`languageCode`**  | <code>string</code>  |                                                                 |
 | **`autoGenerated`** | <code>boolean</code> | True when the track was machine-generated rather than authored. |
-
 
 #### SponsorBlockSegment
 
@@ -426,7 +412,6 @@ One engine's attempt at an extraction, successful or not.
 | **`startTimeMs`** | <code>number</code>                                                   |                                                       |
 | **`endTimeMs`**   | <code>number</code>                                                   |                                                       |
 
-
 #### OpenSabrSessionOptions
 
 | Prop                  | Type                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
@@ -434,7 +419,6 @@ One engine's attempt at an extraction, successful or not.
 | **`videoUrl`**        | <code>string</code> |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | **`startPositionMs`** | <code>number</code> | Start position in milliseconds. The session preloads around this point, so setting it avoids a wasted seek on resume. Default 0.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | **`maxHeight`**       | <code>number</code> | The tallest video format to open on, in pixels — 720 for 720p. **This is the quality the video will play at, not a ceiling it adapts under.** SABR selects one format when the session opens and serves only that one, and the manifest advertises only what the session can serve, so there is nothing for a player to adapt between. Omitted means the tallest format available, which on a 4K source is 2160p onto whatever handset asked — a real cost in decode and in data. Any host with an opinion about quality should state it. When every format is taller than the cap the shortest one is used, so a 1080p-only video asked for 720p plays at 1080p rather than failing. |
-
 
 #### SabrSessionResult
 
@@ -448,7 +432,6 @@ One engine's attempt at an extraction, successful or not.
 | **`formats`**                 | <code>{}</code>      |                                                                                                                                                                                                                                         |
 | **`isLive`**                  | <code>boolean</code> |                                                                                                                                                                                                                                         |
 | **`durationMs`**              | <code>number</code>  |                                                                                                                                                                                                                                         |
-
 
 #### SabrFormat
 
@@ -465,7 +448,6 @@ A format offered by a SABR session.
 | **`audioTrackId`**     | <code>string</code>             |
 | **`approxDurationMs`** | <code>number</code>             |
 
-
 #### PoTokenOptions
 
 | Prop                | Type                | Description                                                                                                                               |
@@ -475,7 +457,6 @@ A format offered by a SABR session.
 | **`clientVersion`** | <code>string</code> | InnerTube client version the token was minted against.                                                                                    |
 | **`playerPoToken`** | <code>string</code> | The minted Proof-of-Origin token.                                                                                                         |
 | **`ttlMs`**         | <code>number</code> | Lifetime in milliseconds. Defaults to just under 12 hours, matching the integrity token a PO token is derived from. Pass 0 for no expiry. |
-
 
 #### EngineStatus
 
@@ -488,9 +469,7 @@ Availability of each engine and of the optional native playback path.
 | **`newPipeVersion`**  | <code>string</code>  |                                                                            |
 | **`media3Available`** | <code>boolean</code> | True when androidx.media3 was found, enabling the native MediaSource path. |
 
-
 ### Type Aliases
-
 
 #### ExtractionEngine
 
@@ -498,14 +477,18 @@ Which extractor produced a result.
 
 <code>'pipepipe' | 'newpipe'</code>
 
-
 #### StreamType
 
-<code>'VIDEO_STREAM' | 'AUDIO_STREAM' | 'LIVE_STREAM' | 'AUDIO_LIVE_STREAM' | 'POST_LIVE_STREAM' | 'POST_LIVE_AUDIO_STREAM' | 'NONE'</code>
-
+<code>
+  'VIDEO_STREAM' | 'AUDIO_STREAM' | 'LIVE_STREAM' | 'AUDIO_LIVE_STREAM' | 'POST_LIVE_STREAM' | 'POST_LIVE_AUDIO_STREAM'
+  | 'NONE'
+</code>
 
 #### SponsorBlockCategory
 
-<code>'SPONSOR' | 'INTRO' | 'OUTRO' | 'INTERACTION' | 'HIGHLIGHT' | 'SELF_PROMO' | 'NON_MUSIC' | 'PREVIEW' | 'FILLER' | 'PENDING'</code>
+<code>
+  'SPONSOR' | 'INTRO' | 'OUTRO' | 'INTERACTION' | 'HIGHLIGHT' | 'SELF_PROMO' | 'NON_MUSIC' | 'PREVIEW' | 'FILLER' |
+  'PENDING'
+</code>
 
 </docgen-api>
