@@ -140,6 +140,9 @@ open class PipePlayerPlugin : Plugin() {
             "media3UiComposeAvailable",
             hasPlayerClass("androidx.media3.ui.compose.modifiers.ExtensionsKt"),
         )
+        // overlayInstance again: a status question must not build a player to
+        // answer "no, nothing offline is playing".
+        result.put("playingOffline", overlayInstance?.playingOffline == true)
         call.resolve(result)
     }
 
@@ -340,20 +343,44 @@ open class PipePlayerPlugin : Plugin() {
         }
     }
 
+    /**
+     * Load a URL or a set of local files, and prepare.
+     *
+     * Exactly one of `url` and `offline`. Both or neither rejects: a silent
+     * fall back to the network would hide a broken download behind a data
+     * charge.
+     *
+     * The request is parsed **before** `runOnUiThread`, so a malformed contract
+     * rejects synchronously rather than on some later frame. The parsing itself
+     * lives in [PipeLoadRequest] rather than here, so it can be tested without
+     * standing up a bridge.
+     */
     @PluginMethod
     fun load(call: PluginCall) {
         if (rejectIfUnavailable(call)) return
-        val url = call.getString("url")
-        if (url.isNullOrBlank()) {
-            call.reject("url is required")
+
+        val request = try {
+            PipeLoadRequest.parse(
+                url = call.getString("url"),
+                offline = call.getObject("offline"),
+                startPositionMs = call.getLong("startPositionMs") ?: 0L,
+            )
+        } catch (invalid: Exception) {
+            call.reject(invalid.message)
             return
         }
+
         activity.runOnUiThread {
             runCatching {
                 overlay.attach()
-                overlay.load(url)
+                when (request) {
+                    is PipeLoadRequest.Url ->
+                        overlay.load(request.url, request.startPositionMs)
+                    is PipeLoadRequest.Offline ->
+                        overlay.loadOffline(request.source, request.startPositionMs)
+                }
             }.onSuccess { call.resolve() }
-                .onFailure { call.reject("could not attach player: ${it.message}") }
+                .onFailure { call.reject("could not load: ${it.message}") }
         }
     }
 

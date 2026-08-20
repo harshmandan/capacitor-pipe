@@ -1,6 +1,6 @@
 import { WebPlugin } from '@capacitor/core';
 
-import type { DockRect, PipePlayerPlugin, PlayerConfig, PlayerStatus } from './player';
+import type { DockRect, OfflineSource, PipePlayerPlugin, PlayerConfig, PlayerStatus } from './player';
 
 const UNSUPPORTED =
   "capacitor-pipe's player is Android-only. On web, play the extracted stream URL " +
@@ -26,6 +26,7 @@ export class PipePlayerWeb extends WebPlugin implements PipePlayerPlugin {
       media3UiComposeAvailable: false,
       corePipAvailable: false,
       pipSupported: false,
+      playingOffline: false,
     };
   }
 
@@ -37,7 +38,7 @@ export class PipePlayerWeb extends WebPlugin implements PipePlayerPlugin {
     throw this.unavailable(UNSUPPORTED);
   }
 
-  async load(_options: { url: string }): Promise<void> {
+  async load(_options: { url?: string; offline?: OfflineSource; startPositionMs?: number }): Promise<void> {
     throw this.unavailable(UNSUPPORTED);
   }
 

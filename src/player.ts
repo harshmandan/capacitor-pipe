@@ -58,6 +58,14 @@ export interface PlayerStatus {
    * is necessary but not sufficient — see `pip` in {@link PlayerConfig}.
    */
   pipSupported: boolean;
+  /**
+   * True when the current media came from `offline` rather than `url`.
+   *
+   * Reported rather than rendered — the host still owns `qualityLabel` and
+   * every other piece of chrome text. This exists so a host does not have to
+   * shadow the state and drift out of sync with it.
+   */
+  playingOffline: boolean;
 }
 
 /**
@@ -97,6 +105,52 @@ export interface PlayerButton {
  * worse than either extreme. If you need a different player, this is the wrong
  * library.
  */
+/**
+ * Where the decryption key comes from.
+ *
+ * `keyRef` is the path to prefer: the key is resolved natively by a provider
+ * the host registers, so it never crosses the bridge and never sits in a JS
+ * string. `keyBase64` exists for hosts with no native code of their own — it
+ * works, and it is weaker.
+ */
+export type OfflineKey = { keyRef: string } | { keyBase64: string };
+
+/**
+ * AES-128-CTR, no padding.
+ *
+ * No header, no trailer, and ciphertext is the same length as plaintext, so
+ * the file seeks by arithmetic. The IV is not secret; the downloader stores it
+ * beside the file and passes it here.
+ *
+ * This stops file-manager copying, USB pulls and other apps. It does not stop
+ * a rooted device or someone who decompiles the APK.
+ */
+export type OfflineCipher = {
+  kind: 'aes-ctr';
+  /** 16 bytes, base64. Unique per file. */
+  ivBase64: string;
+} & OfflineKey;
+
+export interface OfflineTrack {
+  /** Absolute path to a local file. The player never guesses a directory. */
+  path: string;
+  /** Container hint, e.g. 'video/mp4'. Used only to tell the two tracks apart. */
+  mimeType?: string;
+  /** Omit for a plaintext file. */
+  cipher?: OfflineCipher;
+}
+
+export interface OfflineSource {
+  /**
+   * One track when the file is muxed, two when video and audio were
+   * downloaded separately.
+   *
+   * Two is not an edge case: YouTube muxes only up to 360p (itag 18).
+   * Everything above it is video-only and needs its audio merged at playback.
+   */
+  tracks: [OfflineTrack] | [OfflineTrack, OfflineTrack];
+}
+
 export interface PlayerConfig {
   /** The one colour you control. Accepts `#RGB`, `#RRGGBB`, `#AARRGGBB`. */
   accentColor?: string;
@@ -218,8 +272,26 @@ export interface PipePlayerPlugin {
    */
   undock(): Promise<void>;
 
-  /** Load a media URL and prepare it. Does not start playback. */
-  load(options: { url: string }): Promise<void>;
+  /**
+   * Load media and prepare it. Does not start playback.
+   *
+   * Exactly one of `url` and `offline`. Passing both, or neither, rejects —
+   * there is no implicit fallback, because a silent fall back to the network
+   * would hide a broken download behind a data charge.
+   */
+  load(options: {
+    url?: string;
+    offline?: OfflineSource;
+    /**
+     * Where to start, in milliseconds.
+     *
+     * Default 0, matching the existing behaviour: a new video starts at the
+     * beginning. Set it when the media is changing but the *video* is not —
+     * a quality switch, or going offline↔online — so the switch does not
+     * restart playback.
+     */
+    startPositionMs?: number;
+  }): Promise<void>;
 
   play(): Promise<void>;
 

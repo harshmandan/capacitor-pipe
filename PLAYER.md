@@ -64,6 +64,97 @@ edge to play faster through, so the rate would climb, hit the edge and stall.
 Note the current scrubber treats live as "at the live edge" and does not model a
 DVR window — behind-the-edge playback shows a full bar.
 
+## Offline files
+
+`load()` takes either a `url` or an `offline` source, never both and never
+neither — a silent fall back to the network would hide a broken download behind
+a data charge.
+
+```ts
+await PipePlayer.load({
+  offline: {
+    tracks: [
+      { path: '/data/.../v.mp4', mimeType: 'video/mp4', cipher: video },
+      { path: '/data/.../a.mp4', mimeType: 'audio/mp4', cipher: audio },
+    ],
+  },
+  startPositionMs: 300_000,
+});
+```
+
+### Why two tracks
+
+YouTube muxes video and audio together only up to 360p (itag 18). Everything
+above it is video-only and needs its audio merged at playback, so a two-track
+source is the normal case rather than an edge one. One track is a muxed file;
+two are merged with a `MergingMediaSource`.
+
+### This package does not download
+
+No HTTP, no queue, no `WorkManager`, no notification, no file layout, no key
+storage. Paths, IVs and keys arrive from the host; the player turns them into
+playable bytes and nothing else. That boundary is deliberate — Media3's
+`DownloadManager` + `SimpleCache` was the first answer and is the wrong one
+here, because `SimpleCache` allows one instance per directory per process, so a
+downloader living in another plugin would have to export the singleton across a
+plugin boundary with both sides pinned to the same Media3 version, and it forces
+its opaque chunked format and its eviction model onto files the user thinks they
+own.
+
+### The cipher
+
+**AES-128-CTR, no padding.** 16-byte key, 16-byte IV unique per file, no header,
+no trailer, ciphertext the same length as the plaintext. Seeking to byte `p` is
+arithmetic:
+
+```
+blockIndex   = p / 16
+blockOffset  = p % 16
+counterBlock = bigEndianAdd(iv, blockIndex)
+```
+
+then initialise with `counterBlock` and discard `blockOffset` keystream bytes.
+The IV is not secret; store it beside the file and pass it as `ivBase64`.
+
+Deliberately **not** Media3's `AesCipherDataSource`: it derives its nonce from
+`DataSpec.key` through an internal FNV-64 hash, which would couple the on-disk
+format to a Media3 implementation detail across a version bump and across two
+separate codebases. The explicit IV is ours.
+
+Honestly: this stops file-manager copying, USB pulls and other apps. It does not
+stop a rooted device or someone who decompiles the APK. It is not DRM.
+
+### Keys
+
+`keyBase64` works and is the weaker option — the key crosses the bridge and sits
+in a JS string. Prefer `keyRef`, an opaque host-defined string resolved in your
+own Kotlin:
+
+```kotlin
+PipePlayerOffline.setKeyProvider { ref -> myKeyStore.unwrap(ref) }
+```
+
+A `keyRef` with no provider registered is a configuration error and rejects
+saying so.
+
+**The trap:** an `AndroidKeyStore` `SecretKey` is non-exportable, so
+`secretKey.encoded` returns **null**. The provider cannot hand back a Keystore
+key directly. The shape that works is a random 16-byte data key, wrapped with a
+Keystore AES-GCM key and unwrapped on demand.
+
+### Switching quality, or going offline↔online
+
+Just another `load()` with `startPositionMs` set to the current position. The
+position goes into `setMediaItem`/`setMediaSource` rather than a `seekTo` after
+`prepare()`, so there is no flash of frame zero.
+
+`getPlayerStatus().playingOffline` reports which kind of media is loaded. It is
+reported, not rendered — the host still owns every piece of chrome text.
+
+### Subtitles
+
+None. The player renders no text track today, offline or online.
+
 ## Do not lock your Activity to portrait
 
 ```xml
@@ -174,6 +265,7 @@ devices.
 * [`enterPip()`](#enterpip)
 * [`addListener('playerAction', ...)`](#addlistenerplayeraction-)
 * [Interfaces](#interfaces)
+* [Type Aliases](#type-aliases)
 
 </docgen-index>
 
@@ -239,14 +331,18 @@ this is how a host says "I am navigating away but keep playing".
 ### load(...)
 
 ```typescript
-load(options: { url: string; }) => any
+load(options: { url?: string; offline?: OfflineSource; startPositionMs?: number; }) => any
 ```
 
-Load a media URL and prepare it. Does not start playback.
+Load media and prepare it. Does not start playback.
 
-| Param         | Type                          |
-| ------------- | ----------------------------- |
-| **`options`** | <code>{ url: string; }</code> |
+Exactly one of `url` and `offline`. Passing both, or neither, rejects —
+there is no implicit fallback, because a silent fall back to the network
+would hide a broken download behind a data charge.
+
+| Param         | Type                                                                                                           |
+| ------------- | -------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ url?: string; offline?: <a href="#offlinesource">OfflineSource</a>; startPositionMs?: number; }</code> |
 
 **Returns:** <code>any</code>
 
@@ -399,6 +495,7 @@ minimising means in your layout.
 | **`media3UiComposeAvailable`** | <code>boolean</code> | Whether `media3-ui-compose` is present. **Required** for the player, not optional: the surface sizes the video with its `resizeWithContentScale`. `available` already accounts for it; this is here so a missing one is nameable rather than just "unavailable".                                       |
 | **`corePipAvailable`**         | <code>boolean</code> | Whether `androidx.core:core-pip` is on the classpath. Reported separately from `pipSupported` so you can tell "this device cannot do PiP" apart from "you did not add the dependency".                                                                                                                 |
 | **`pipSupported`**             | <code>boolean</code> | Whether Picture-in-Picture could work on this device. Note this reports the OS and hardware only. It cannot see whether your Activity declares `android:supportsPictureInPicture`, so this being true is necessary but not sufficient — see `pip` in {@link <a href="#playerconfig">PlayerConfig</a>}. |
+| **`playingOffline`**           | <code>boolean</code> | True when the current media came from `offline` rather than `url`. Reported rather than rendered — the host still owns `qualityLabel` and every other piece of chrome text. This exists so a host does not have to shadow the state and drift out of sync with it.                                     |
 
 
 #### DockRect
@@ -413,14 +510,23 @@ A rect in CSS pixels, as measured by the host's layout.
 | **`h`** | <code>number</code> |
 
 
+#### OfflineSource
+
+| Prop         | Type                                                        | Description                                                                                                                                                                                                                        |
+| ------------ | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`tracks`** | <code>[OfflineTrack] \| [OfflineTrack, OfflineTrack]</code> | One track when the file is muxed, two when video and audio were downloaded separately. Two is not an edge case: YouTube muxes only up to 360p (itag 18). Everything above it is video-only and needs its audio merged at playback. |
+
+
+#### OfflineTrack
+
+| Prop           | Type                                                    | Description                                                               |
+| -------------- | ------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **`path`**     | <code>string</code>                                     | Absolute path to a local file. The player never guesses a directory.      |
+| **`mimeType`** | <code>string</code>                                     | Container hint, e.g. 'video/mp4'. Used only to tell the two tracks apart. |
+| **`cipher`**   | <code><a href="#offlinecipher">OfflineCipher</a></code> | Omit for a plaintext file.                                                |
+
+
 #### PlayerConfig
-
-The player's entire styling surface.
-
-Deliberately this small. Layout, sizing, spacing, timing and behaviour are
-fixed: the interaction is the product, and a half-restyled version of it is
-worse than either extreme. If you need a different player, this is the wrong
-library.
 
 | Prop                   | Type                                                  | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | ---------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -471,5 +577,34 @@ Emitted when a control the host owns is tapped.
 | -------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`action`**   | <code>string</code> | One of: - `speed` / `quality` — the button was tapped and a sheet opened - `speedSelected` / `qualitySelected` — a row was chosen; `buttonId` is its id - `minimise` — shrunk to the corner; the player keeps playing - `expand` — left the corner window or PiP - `expandUnavailable` — expand was pressed with no rect claimed on this page. Route back to the page that owns the video; see PLAYER.md. - `previous` / `next` — queue controls, if you enabled them - `button` — your custom control; `buttonId` is its id |
 | **`buttonId`** | <code>string</code> | The id of the button or the selected row, depending on `action`.                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+
+
+### Type Aliases
+
+
+#### OfflineCipher
+
+AES-128-CTR, no padding.
+
+No header, no trailer, and ciphertext is the same length as plaintext, so
+the file seeks by arithmetic. The IV is not secret; the downloader stores it
+beside the file and passes it here.
+
+This stops file-manager copying, USB pulls and other apps. It does not stop
+a rooted device or someone who decompiles the APK.
+
+<code>{ kind: 'aes-ctr'; /** 16 bytes, base64. Unique per file. */ ivBase64: string; } & <a href="#offlinekey">OfflineKey</a></code>
+
+
+#### OfflineKey
+
+Where the decryption key comes from.
+
+`keyRef` is the path to prefer: the key is resolved natively by a provider
+the host registers, so it never crosses the bridge and never sits in a JS
+string. `keyBase64` exists for hosts with no native code of their own — it
+works, and it is weaker.
+
+<code>{ keyRef: string } | { keyBase64: string }</code>
 
 </docgen-api>

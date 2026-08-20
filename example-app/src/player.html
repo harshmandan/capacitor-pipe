@@ -115,6 +115,18 @@
       <button id="live">Load LIVE stream</button>
     </div>
 
+    <!--
+      Offline. "Prepare" is the DOWNLOADER's job, standing in for the host app:
+      it fetches the sample once, encrypts it with WebCrypto and writes it to
+      app storage. The plugin never sees any of that — it is handed a path, an
+      IV and a key, and nothing else.
+    -->
+    <div class="row">
+      <button id="prepare">Prepare offline file</button>
+      <button id="offline">Play offline</button>
+      <button id="offlineSeek">Play offline @5s</button>
+    </div>
+
     <pre id="log">ready</pre>
 
     <script type="module" src="./js/player.js"></script>

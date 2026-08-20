@@ -142,3 +142,104 @@ window.addEventListener('resize', () => {
 PipePlayer.getPlayerStatus()
   .then((status) => log('status', status))
   .catch((error) => log('status', 'FAILED:', error?.message ?? String(error)));
+
+/*
+ * ---------------------------------------------------------------------------
+ * Offline
+ *
+ * Everything in this block belongs to the HOST, not the plugin. The plugin does
+ * not download, does not encrypt and does not store keys — it is handed a path,
+ * an IV and a key. Doing the downloader's half here in plain JavaScript keeps
+ * that boundary visible.
+ *
+ * WebCrypto's AES-CTR with `length: 128` increments the whole counter block,
+ * which is what Java's `AES/CTR/NoPadding` does — so a file encrypted here
+ * decrypts natively. A shorter counter length would not.
+ */
+
+const OFFLINE_FILE = 'offline-sample.mp4';
+
+// Not secret, and not persisted here: a real host stores the IV beside the file
+// and keeps the key in the Keystore, handing over a `keyRef` instead.
+let offlineCipher = null;
+
+const fromBase64 = (text) => {
+  const binary = atob(text);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+};
+
+const toBase64 = (bytes) => {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+};
+
+document.getElementById('prepare').onclick = run('prepare', async () => {
+  const { Filesystem, Directory } = await import('@capacitor/filesystem');
+
+  const key = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(16));
+
+  /*
+   * CapacitorHttp, not fetch(). The page's origin is capacitor://localhost and
+   * the sample host sends no CORS headers, so a plain fetch fails with the
+   * uninformative "Failed to fetch". A real downloader is native anyway; this
+   * is the nearest JS equivalent.
+   */
+  const { CapacitorHttp } = await import('@capacitor/core');
+  const response = await CapacitorHttp.get({ url: SAMPLE, responseType: 'blob' });
+  const plain = fromBase64(response.data);
+  const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-CTR', false, ['encrypt']);
+  const encrypted = new Uint8Array(
+    // length: 128 — the whole block is the counter, matching Java.
+    await crypto.subtle.encrypt({ name: 'AES-CTR', counter: iv, length: 128 }, cryptoKey, plain),
+  );
+
+  await Filesystem.writeFile({
+    path: OFFLINE_FILE,
+    data: toBase64(encrypted),
+    directory: Directory.Data,
+  });
+  const { uri } = await Filesystem.getUri({ path: OFFLINE_FILE, directory: Directory.Data });
+
+  offlineCipher = {
+    // The player wants a filesystem path, not a URI.
+    path: uri.replace(/^file:\/\//, ''),
+    ivBase64: toBase64(iv),
+    keyBase64: toBase64(key),
+  };
+  return { bytes: encrypted.length, path: offlineCipher.path };
+});
+
+const loadOffline = async (startPositionMs) => {
+  if (!offlineCipher) throw new Error('press "Prepare offline file" first');
+  await PipePlayer.configure({
+    title: 'Big Buck Bunny — offline',
+    subtitle: 'AES-128-CTR, local file',
+    qualityLabel: 'Offline',
+  });
+  await PipePlayer.load({
+    offline: {
+      tracks: [
+        {
+          path: offlineCipher.path,
+          mimeType: 'video/mp4',
+          cipher: {
+            kind: 'aes-ctr',
+            ivBase64: offlineCipher.ivBase64,
+            keyBase64: offlineCipher.keyBase64,
+          },
+        },
+      ],
+    },
+    startPositionMs,
+  });
+  // playingOffline is reported, not rendered — proving it flipped is the point.
+  const { playingOffline } = await PipePlayer.getPlayerStatus();
+  return { playingOffline, startPositionMs };
+};
+
+document.getElementById('offline').onclick = run('offline', () => loadOffline(0));
+// Starts mid-video with no flash of frame zero: the position goes into
+// setMediaSource, not a seekTo after prepare().
+document.getElementById('offlineSeek').onclick = run('offline@5s', () => loadOffline(5000));

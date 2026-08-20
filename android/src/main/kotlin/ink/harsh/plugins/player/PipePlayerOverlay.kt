@@ -197,6 +197,16 @@ class PipePlayerOverlay(private val activity: Activity) {
         mutableStateOf(listOf("0.5x", "1x", "1.5x", "2x").map { SheetOption(it, it) })
     private val qualityOptions = mutableStateOf(listOf(SheetOption("Auto", "Auto")))
 
+    /**
+     * The current media came from local files rather than a URL.
+     *
+     * Reported through `getPlayerStatus`, not rendered: the host owns every
+     * piece of chrome text. It exists so a host does not have to shadow this
+     * state and drift out of sync with it.
+     */
+    var playingOffline: Boolean = false
+        private set
+
     /** Raised when a consumer-supplied button, or quality/speed, is tapped. */
     var onChromeEvent: ((String, String?) -> Unit)? = null
 
@@ -1164,8 +1174,11 @@ class PipePlayerOverlay(private val activity: Activity) {
      * property of the media, and resetting it every video would quietly undo a
      * setting the user chose. An in-flight press-and-hold boost is NOT kept —
      * the finger that started it is long gone.
+     *
+     * Shared by [load] and [loadOffline], so a change here must be checked
+     * against both.
      */
-    fun load(url: String) {
+    private fun resetForNewMedia() {
         ended.value = false
         videoAspect.value = 0f
         positionMs.value = 0L
@@ -1184,9 +1197,38 @@ class PipePlayerOverlay(private val activity: Activity) {
          * keeps its corner player instead of losing the video entirely.
          */
         setMini(false)
+    }
 
+    /**
+     * Play a URL from [startPositionMs].
+     *
+     * The position goes into `setMediaItem` rather than a `seekTo` after
+     * `prepare()`: a post-prepare seek buffers position 0 first and shows a
+     * visible flash of the wrong frame.
+     */
+    fun load(url: String, startPositionMs: Long = 0L) {
+        resetForNewMedia()
+        playingOffline = false
         ensurePlayer().apply {
-            setMediaItem(MediaItem.fromUri(url))
+            setMediaItem(MediaItem.fromUri(url), startPositionMs)
+            prepare()
+        }
+    }
+
+    /**
+     * Play local files, optionally encrypted, from [startPositionMs].
+     *
+     * Builds its own [MediaSource], so [ensurePlayer] needs no factory override
+     * and the online path is untouched.
+     */
+    fun loadOffline(source: PipeOfflineSource, startPositionMs: Long = 0L) {
+        // Built before any state is cleared: a source that cannot be built must
+        // leave the currently playing video exactly as it was.
+        val media = PipePlayerOffline.buildMediaSource(activity, source)
+        resetForNewMedia()
+        playingOffline = true
+        ensurePlayer().apply {
+            setMediaSource(media, startPositionMs)
             prepare()
         }
     }
