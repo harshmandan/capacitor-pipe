@@ -45,6 +45,13 @@ before you render their output. See [DIVERGENCES.md](DIVERGENCES.md); the
 short version is that `dislikeCount`, `description` markup and SABR support all
 depend on which engine answered.
 
+They also differ in what YouTube *gives* them, which is not a property of this
+library and changes without notice. As of 2026-08-20 the primary engine gets no
+progressive stream at all for videos where the fallback gets 360p, so a consumer
+that wants a plain URL should ask the other engine before concluding there is
+none. [EXTRACTION.md](EXTRACTION.md) records that and every other dated
+observation, with how it was measured.
+
 Pass `sponsorBlock: true` to also fetch SponsorBlock segments
 (`streamInfo.sponsorBlockSegments`). Best-effort, and PipePipe-only — the
 NewPipe fallback has no SponsorBlock support, so results that fell through

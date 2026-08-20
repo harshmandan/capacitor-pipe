@@ -15,6 +15,20 @@ The repo previously declared MIT while already depending on GPL-3.0
 NewPipeExtractor; that was wrong and is now fixed. Do not reintroduce a
 permissive licence header.
 
+## The four documents, and which answers what
+
+| File                             | Answers                                                                                                                       |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| this file                        | How to build it, and every trap in doing so.                                                                                  |
+| [DIVERGENCES.md](DIVERGENCES.md) | How the two engines differ **mechanically**. Checkable from source, and partly asserted by a script.                           |
+| [EXTRACTION.md](EXTRACTION.md)   | What **YouTube** was observed doing, when, and which decision followed. Dated, because the other party changes without asking. |
+| [PLAYER.md](PLAYER.md)           | The optional native player.                                                                                                   |
+
+**A claim about YouTube's behaviour goes in EXTRACTION.md with a date and the
+measurement that produced it, or it is not evidence.** A claim about our own two
+dependencies goes in DIVERGENCES.md. Putting the first kind in a code comment is
+how a finding from last quarter comes to read as a law of nature.
+
 ## Layout
 
 ```
