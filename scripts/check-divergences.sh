@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Verify the divergences recorded in DIVERGENCES.md still hold.
+# Verify the divergences recorded in docs/DIVERGENCES.md still hold.
 #
 # Most of them are self-catching: if PipePipe's Response constructor changes
 # arity, the build breaks and you go fix it. The dangerous ones are those that
@@ -8,7 +8,7 @@
 # pointless retries with no error, no log and no failed build.
 #
 # This script asserts the shape of both forks' source against what our code
-# assumes. A CHANGED line means: update the code, then update DIVERGENCES.md.
+# assumes. A CHANGED line means: update the code, then update docs/DIVERGENCES.md.
 #
 # Usage: scripts/check-divergences.sh
 #
@@ -143,7 +143,7 @@ if [ "$NP_SABR_FILES" -le 2 ]; then
     ok 8 "NewPipe SABR footprint still negligible ($NP_SABR_FILES file(s), javadoc only)"
 else
     changed 8 "NewPipe now mentions SABR in $NP_SABR_FILES files — upstream may be implementing it"
-    note "If so, revisit DIVERGENCES.md §8 entirely: requiresSabr:false becomes a lie,"
+    note "If so, revisit docs/DIVERGENCES.md §8 entirely: requiresSabr:false becomes a lie,"
     note "and the two engines may become genuinely equivalent."
 fi
 
@@ -219,8 +219,8 @@ printf '\033[31m%s of %s divergence checks CHANGED.\033[0m\n' "$changed" "$check
 cat <<'EOF'
 
 A changed divergence means upstream moved. Do all three:
-  1. Fix the affected code (see the §section in DIVERGENCES.md for file:line).
-  2. Update that section of DIVERGENCES.md to describe the new reality.
+  1. Fix the affected code (see the §section in docs/DIVERGENCES.md for file:line).
+  2. Update that section of docs/DIVERGENCES.md to describe the new reality.
   3. Re-run this script until clean.
 
 Do not silence a check by deleting it. If a divergence genuinely disappeared —

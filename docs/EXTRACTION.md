@@ -18,7 +18,7 @@ Writing it down is cheaper than measuring it again, as long as the writing says
 | File               | Answers                                                                                    |
 | ------------------ | ------------------------------------------------------------------------------------------ |
 | `DIVERGENCES.md`   | How the two engines differ **mechanically** — API shapes, exception types, bundled deps. Asserted by `scripts/check-divergences.sh` where it can be. |
-| `CLAUDE.md`        | How to build this, and the traps in doing so.                                              |
+| `../CLAUDE.md`     | How to build this, and the traps in doing so.                                              |
 | `PLAYER.md`        | What the player does with what extraction returns.                                         |
 | **this file**      | What YouTube was observed doing, when, and which decision followed.                        |
 

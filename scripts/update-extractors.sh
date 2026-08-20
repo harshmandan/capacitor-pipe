@@ -148,12 +148,12 @@ log "Checking the extractor API the plugin depends on still exists"
 verify_api "$PP" "PipePipeExtractor" "${PIPEPIPE_API[@]}"
 verify_api "$NP" "NewPipeExtractor" "${NEWPIPE_API[@]}"
 
-log "Checking the divergences recorded in DIVERGENCES.md still hold"
+log "Checking the divergences recorded in docs/DIVERGENCES.md still hold"
 # Run before the rebuild: a changed divergence explains a build failure that
 # would otherwise look mysterious, and some divergences never fail the build
 # at all.
 if ! "$ROOT/scripts/check-divergences.sh"; then
-    die "Divergences changed. Fix the code and update DIVERGENCES.md before continuing.
+    die "Divergences changed. Fix the code and update docs/DIVERGENCES.md before continuing.
      Pins have been rolled back."
 fi
 
@@ -172,7 +172,7 @@ git -C "$NP" log --oneline -1 | sed 's/^/    NewPipeExtractor   /'
 cat <<'EOF'
 
 Next steps — the build passing does not prove extraction still works:
-  1. Walk DIVERGENCES.md for the dependency you just bumped. Some divergences
+  1. Walk docs/DIVERGENCES.md for the dependency you just bumped. Some divergences
      fail silently, not at compile time — exception matching by simple name
      (section 10) degrades into pointless retries with no error at all.
   2. Run the example app against a few real videos, including one SABR-only.

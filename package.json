@@ -54,7 +54,7 @@
     "extractors:update": "./scripts/update-extractors.sh",
     "extractors:check": "./scripts/check-divergences.sh",
     "prepublishOnly": "npm run build",
-    "docgen:player": "docgen --api PipePlayerPlugin --output-readme PLAYER.md --output-json dist/docs-player.json"
+    "docgen:player": "docgen --api PipePlayerPlugin --output-readme docs/PLAYER.md --output-json dist/docs-player.json"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.0",

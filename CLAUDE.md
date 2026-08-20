@@ -20,18 +20,19 @@ permissive licence header.
 | File                                     | Answers                                                                                                                        |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | this file                                | How to build it, and every trap in doing so.                                                                                   |
-| [DIVERGENCES.md](DIVERGENCES.md)         | How the two engines differ **mechanically**. Checkable from source, and partly asserted by a script.                           |
+| [docs/DIVERGENCES.md](docs/DIVERGENCES.md)         | How the two engines differ **mechanically**. Checkable from source, and partly asserted by a script.                           |
 | [docs/EXTRACTION.md](docs/EXTRACTION.md) | What **YouTube** was observed doing, when, and which decision followed. Dated, because the other party changes without asking. |
-| [PLAYER.md](PLAYER.md)                   | The optional native player.                                                                                                    |
+| [docs/PLAYER.md](docs/PLAYER.md)                   | The optional native player.                                                                                                    |
 
 **A claim about YouTube's behaviour goes in docs/EXTRACTION.md with a date and the
 measurement that produced it, or it is not evidence.** A claim about our own two
-dependencies goes in DIVERGENCES.md. Putting the first kind in a code comment is
+dependencies goes in docs/DIVERGENCES.md. Putting the first kind in a code comment is
 how a finding from last quarter comes to read as a law of nature.
 
 ## Layout
 
 ```
+docs/                         DIVERGENCES · EXTRACTION · PLAYER (the table above)
 src/                          TypeScript API (definitions.ts is the contract)
 android/src/main/kotlin/ink/harsh/plugins/pipe/
                               plugin, engine chain, SABR
@@ -83,7 +84,7 @@ on. Add to them whenever the wrapper starts calling something new.
 
 ## Divergences — required workflow
 
-[DIVERGENCES.md](DIVERGENCES.md) records every point where our code forks to
+[docs/DIVERGENCES.md](docs/DIVERGENCES.md) records every point where our code forks to
 handle the two engines differently, with file and symbol anchors and what to
 re-check per dependency. `scripts/check-divergences.sh` asserts them against both
 submodules' source (39 checks), and `update-extractors.sh` runs it before
@@ -94,7 +95,7 @@ npm run extractors:check     # assert the recorded divergences still hold
 ```
 
 **Whenever you write code that treats the two engines differently, add it to
-DIVERGENCES.md in the same change** — a new section, plus a check in
+docs/DIVERGENCES.md in the same change** — a new section, plus a check in
 `check-divergences.sh` if it can be asserted mechanically. This is not
 documentation housekeeping; several divergences fail _silently_. Section 10's
 exception matching by simple name degrades into pointless retries with no error,
@@ -110,7 +111,7 @@ Triggers for a new entry — if you find yourself doing any of these, record it:
 - a dependency, toolchain or build step that applies to only one submodule
 
 When upstream changes and a check goes red, do all three: fix the code, update
-the DIVERGENCES.md section, re-run until clean. Never silence a check to make it
+the docs/DIVERGENCES.md section, re-run until clean. Never silence a check to make it
 pass — if the forks genuinely converged, remove the code branch first, then the
 row, then the check.
 

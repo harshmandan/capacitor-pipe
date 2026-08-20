@@ -214,7 +214,7 @@ export interface PlayerConfig {
    * auto-enter on 12+, so there is nothing version-specific for you to write.
    *
    * Pin `core-pip` to `1.0.0-alpha02`. alpha03 requires AGP 9.1.0, which
-   * Capacitor 8 apps do not ship — see PLAYER.md.
+   * Capacitor 8 apps do not ship — see docs/PLAYER.md.
    */
   pip?: boolean;
   /**
@@ -244,7 +244,7 @@ export interface PlayerActionEvent {
    * - `minimise` — shrunk to the corner; the player keeps playing
    * - `expand` — left the corner window or PiP
    * - `expandUnavailable` — expand was pressed with no rect claimed on this
-   *   page. Route back to the page that owns the video; see PLAYER.md.
+   *   page. Route back to the page that owns the video; see docs/PLAYER.md.
    * - `previous` / `next` — queue controls, if you enabled them
    * - `button` — your custom control; `buttonId` is its id
    */
