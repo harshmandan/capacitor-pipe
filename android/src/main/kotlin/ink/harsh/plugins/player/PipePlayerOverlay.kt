@@ -33,6 +33,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import ink.harsh.plugins.pipe.media3.PipeSabrMedia3
 
 /**
  * The player's native surface, composited over the host WebView.
@@ -1321,6 +1322,27 @@ class PipePlayerOverlay(private val activity: Activity) {
      * Builds its own [MediaSource], so [ensurePlayer] needs no factory override
      * and the online path is untouched.
      */
+    /**
+     * Play an open SABR session through its own Media3 source.
+     *
+     * The loopback manifest is the portable route and this is the direct one:
+     * no socket, no cleartext exemption, no HTTP copy of every segment. Both
+     * read the same synthesised manifest, so what plays is identical.
+     *
+     * `playingOffline` stays false — this is as online as media gets.
+     */
+    fun loadSabrSession(sessionId: String, startPositionMs: Long = 0L) {
+        // Built before any state is cleared, exactly as loadOffline does: a
+        // session that cannot be found must leave the current video playing.
+        val media = PipeSabrMedia3.mediaSource(sessionId)
+        resetForNewMedia()
+        playingOffline = false
+        ensurePlayer().apply {
+            setMediaSource(media, startPositionMs)
+            prepare()
+        }
+    }
+
     fun loadOffline(source: PipeOfflineSource, startPositionMs: Long = 0L) {
         // Built before any state is cleared: a source that cannot be built must
         // leave the currently playing video exactly as it was.

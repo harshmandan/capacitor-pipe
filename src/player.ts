@@ -304,13 +304,26 @@ export interface PipePlayerPlugin {
   /**
    * Load media and prepare it. Does not start playback.
    *
-   * Exactly one of `url` and `offline`. Passing both, or neither, rejects —
-   * there is no implicit fallback, because a silent fall back to the network
-   * would hide a broken download behind a data charge.
+   * Exactly one of `url`, `offline` and `sessionId`. Passing more than one, or
+   * none, rejects — there is no implicit fallback, because a silent fall back
+   * to the network would hide a broken download behind a data charge.
    */
   load(options: {
     url?: string;
     offline?: OfflineSource;
+    /**
+     * An open SABR session, from `Pipe.openSabrSession`, played through its
+     * segment bridge directly.
+     *
+     * The same session is playable by passing its `manifestUrl` as `url`;
+     * this skips the loopback socket, the cleartext exemption and an HTTP copy
+     * of every segment. Identical media either way — both routes read the one
+     * synthesised manifest — so this is an optimisation, not a capability.
+     *
+     * The session must outlive playback: close it when the player is done, not
+     * when `load` resolves.
+     */
+    sessionId?: string;
     /**
      * Where to start, in milliseconds.
      *

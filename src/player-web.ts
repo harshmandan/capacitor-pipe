@@ -38,7 +38,12 @@ export class PipePlayerWeb extends WebPlugin implements PipePlayerPlugin {
     throw this.unavailable(UNSUPPORTED);
   }
 
-  async load(_options: { url?: string; offline?: OfflineSource; startPositionMs?: number }): Promise<void> {
+  async load(_options: {
+    url?: string;
+    offline?: OfflineSource;
+    sessionId?: string;
+    startPositionMs?: number;
+  }): Promise<void> {
     throw this.unavailable(UNSUPPORTED);
   }
 

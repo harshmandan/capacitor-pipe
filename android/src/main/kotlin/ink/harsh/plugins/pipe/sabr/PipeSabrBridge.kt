@@ -131,10 +131,11 @@ class PipeSabrBridge(
      * response.
      */
     @Throws(IOException::class, ExtractionException::class)
-    fun prepareTimelines(initialPositionMs: Long) {
+    @JvmOverloads
+    fun prepareTimelines(initialPositionMs: Long, maxHeight: Int = 0) {
         val bootstrap = ArrayList<YoutubeSabrInfo.Format>(2)
         val audio = spec.bootstrapAudio()
-        val video = spec.bootstrapVideo()
+        val video = spec.bootstrapVideo(maxHeight)
         if (audio != null) {
             bootstrap.add(audio)
         }

@@ -383,6 +383,7 @@ open class PipePlayerPlugin : Plugin() {
                 url = call.getString("url"),
                 offline = call.getObject("offline"),
                 startPositionMs = call.getLong("startPositionMs") ?: 0L,
+                sessionId = call.getString("sessionId"),
             )
         } catch (invalid: Exception) {
             call.reject(invalid.message)
@@ -397,6 +398,8 @@ open class PipePlayerPlugin : Plugin() {
                         overlay.load(request.url, request.startPositionMs)
                     is PipeLoadRequest.Offline ->
                         overlay.loadOffline(request.source, request.startPositionMs)
+                    is PipeLoadRequest.Sabr ->
+                        overlay.loadSabrSession(request.sessionId, request.startPositionMs)
                 }
             }.onSuccess { call.resolve() }
                 .onFailure { call.reject("could not load: ${it.message}") }

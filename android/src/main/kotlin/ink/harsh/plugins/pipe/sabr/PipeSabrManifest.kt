@@ -63,7 +63,7 @@ object PipeSabrManifest {
         spec: PipeSabrSpec,
         bridge: PipeSabrBridge,
     ) {
-        val formats = usable(spec.videoFormats, bridge)
+        val formats = usable(spec, spec.videoFormats, bridge)
         if (formats.isNotEmpty()) {
             adaptationSet(out, spec, bridge, formats, false, "0")
         }
@@ -80,7 +80,7 @@ object PipeSabrManifest {
         bridge: PipeSabrBridge,
     ) {
         val tracks: MutableMap<String, MutableList<YoutubeSabrInfo.Format>> = LinkedHashMap()
-        for (format in usable(spec.audioFormats, bridge)) {
+        for (format in usable(spec, spec.audioFormats, bridge)) {
             val trackId = Objects.toString(format.audioTrackId, "default")
             var group = tracks[trackId]
             if (group == null) {
@@ -96,19 +96,31 @@ object PipeSabrManifest {
     }
 
     /**
-     * Only formats whose timeline is known can be described.
+     * Only formats this session can actually serve.
      *
-     * The session bootstraps one audio and one video format, so only those
-     * have parsed init segments at manifest time. Emitting a Representation
-     * without a SegmentTimeline would make the player request segments we cannot
-     * place.
+     * **Two conditions, and both are load-bearing.** A timeline is needed to
+     * place segments; an *init segment* is needed to decode them, and only the
+     * bootstrapped audio and video formats have one — SABR selects a format up
+     * front and the session streams that one.
+     *
+     * The init check used to be missing, and the timeline alone let this
+     * advertise every format the extraction knew about: on a real device, 6
+     * video and 8 audio Representations of which 2 were servable. Media3 then
+     * did what an adaptive player does — picked a different Representation —
+     * and every consumer failed the same way, because both of them go through
+     * the same manifest: the loopback server answered `503 Initialisation not
+     * ready` and `PipeSabrDataSource` threw `SABR initialisation missing`. A
+     * manifest that offers what cannot be served is not a smaller bug than one
+     * that offers nothing.
      */
     private fun usable(
+        spec: PipeSabrSpec,
         formats: List<YoutubeSabrInfo.Format>,
         bridge: PipeSabrBridge,
     ): List<YoutubeSabrInfo.Format> {
         val out = ArrayList<YoutubeSabrInfo.Format>()
         for (format in formats) {
+            if (spec.getInitializationData(format) == null) continue
             try {
                 val timeline = bridge.getTimeline(format)
                 val end = timeline.endSequence

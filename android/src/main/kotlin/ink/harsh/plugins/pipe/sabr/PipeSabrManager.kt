@@ -44,8 +44,13 @@ class PipeSabrManager(context: Context, private val engine: PipePipeEngine) {
      * round trips to learn the segment timelines before a manifest can exist.
      * Never call from the main thread.
      */
+    @JvmOverloads
     @Throws(Exception::class)
-    fun open(request: ExtractionRequest, startPositionMs: Long): PipeSabrSession {
+    fun open(
+        request: ExtractionRequest,
+        startPositionMs: Long,
+        maxHeight: Int = 0,
+    ): PipeSabrSession {
         // Must precede extraction: the MWEB player request carries the token,
         // so installing it afterwards is too late for this session.
         PipeSabrPoTokens.enableMinting(context)
@@ -70,7 +75,7 @@ class PipeSabrManager(context: Context, private val engine: PipePipeEngine) {
 
             // Must precede manifest generation: segment counts and durations
             // come from the index inside the init segments this fetches.
-            bridge.prepareTimelines(Math.max(0L, startPositionMs))
+            bridge.prepareTimelines(Math.max(0L, startPositionMs), maxHeight)
 
             val manifest = PipeSabrManifest.build(spec, bridge, extraction.durationMs)
 

@@ -283,6 +283,19 @@ sealed class PipeLoadRequest {
         override val startPositionMs: Long,
     ) : PipeLoadRequest()
 
+    /**
+     * An open SABR session, played from its segment bridge directly.
+     *
+     * The same session is playable from its `manifestUrl` as an ordinary
+     * `Url` — this skips the loopback socket, the cleartext exemption and a
+     * copy of every byte through HTTP. Nothing else differs: both routes go
+     * through the one synthesised manifest.
+     */
+    data class Sabr(
+        val sessionId: String,
+        override val startPositionMs: Long,
+    ) : PipeLoadRequest()
+
     companion object {
 
         private const val BLOCK = 16
@@ -294,18 +307,24 @@ sealed class PipeLoadRequest {
          * developer. Every failure names the field, because "invalid offline
          * source" on its own sends a caller reading Kotlin.
          */
-        fun parse(url: String?, offline: JSObject?, startPositionMs: Long): PipeLoadRequest {
+        @JvmOverloads
+        fun parse(
+            url: String?,
+            offline: JSObject?,
+            startPositionMs: Long,
+            sessionId: String? = null,
+        ): PipeLoadRequest {
             val trimmed = url?.takeIf { it.isNotBlank() }
-            require(!(trimmed != null && offline != null)) {
-                "pass exactly one of url and offline, not both"
+            val session = sessionId?.takeIf { it.isNotBlank() }
+            val given = listOfNotNull(trimmed, offline, session).size
+            require(given <= 1) { "pass exactly one of url, offline and sessionId, not several" }
+            require(given == 1) {
+                "pass exactly one of url, offline and sessionId; none was given"
             }
-            require(!(trimmed == null && offline == null)) {
-                "pass exactly one of url and offline; neither was given"
-            }
-            return if (trimmed != null) {
-                Url(trimmed, startPositionMs)
-            } else {
-                Offline(parseSource(offline!!), startPositionMs)
+            return when {
+                trimmed != null -> Url(trimmed, startPositionMs)
+                session != null -> Sabr(session, startPositionMs)
+                else -> Offline(parseSource(offline!!), startPositionMs)
             }
         }
 

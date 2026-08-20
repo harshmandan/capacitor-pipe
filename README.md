@@ -70,6 +70,34 @@ if (streamInfo.requiresSabr) {
 `manifestUrl` is an ordinary DASH manifest served over loopback, so dash.js,
 Shaka or Media3's `DashMediaSource` all play it unmodified.
 
+### One session, one quality
+
+**A SABR session opens on one video format and serves only that one.** It is
+not an adaptive ladder with a preferred rung: the protocol requires a concrete
+selection up front, and the manifest advertises exactly what the session can
+serve, so there is nothing for a player to switch between.
+
+That makes `maxHeight` the quality knob, and omitting it the loudest possible
+choice — the tallest format there is, which on a 4K source is 2160p onto
+whatever handset asked:
+
+```ts
+const session = await Pipe.openSabrSession({ videoUrl, maxHeight: 720 });
+```
+
+To change quality, close the session and open another with a different cap,
+passing the current position as `startPositionMs` so playback resumes where it
+was. When every format is taller than the cap the shortest is used, so a
+1080p-only video asked for 720p plays rather than failing.
+
+Two things followed from getting this wrong once, and both are worth knowing.
+The manifest used to advertise every format the extraction knew about — 6 video
+and 8 audio Representations of which 2 were servable — and an adaptive player
+picked one of the others and failed on its initialisation segment. Both
+consumers failed identically, because both read the same manifest: the loopback
+server answered `503 Initialisation not ready` and `PipeSabrDataSource` threw
+`SABR initialisation missing`.
+
 **Always close sessions.** Each one holds a WebView-minted token, a listening
 socket and segments spooled to disk.
 
@@ -394,10 +422,11 @@ One engine's attempt at an extraction, successful or not.
 
 #### OpenSabrSessionOptions
 
-| Prop                  | Type                | Description                                                                                                                      |
-| --------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| **`videoUrl`**        | <code>string</code> |                                                                                                                                  |
-| **`startPositionMs`** | <code>number</code> | Start position in milliseconds. The session preloads around this point, so setting it avoids a wasted seek on resume. Default 0. |
+| Prop                  | Type                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`videoUrl`**        | <code>string</code> |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **`startPositionMs`** | <code>number</code> | Start position in milliseconds. The session preloads around this point, so setting it avoids a wasted seek on resume. Default 0.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **`maxHeight`**       | <code>number</code> | The tallest video format to open on, in pixels — 720 for 720p. **This is the quality the video will play at, not a ceiling it adapts under.** SABR selects one format when the session opens and serves only that one, and the manifest advertises only what the session can serve, so there is nothing for a player to adapt between. Omitted means the tallest format available, which on a 4K source is 2160p onto whatever handset asked — a real cost in decode and in data. Any host with an opinion about quality should state it. When every format is taller than the cap the shortest one is used, so a 1080p-only video asked for 720p plays at 1080p rather than failing. |
 
 
 #### SabrSessionResult

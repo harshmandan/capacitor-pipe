@@ -71,9 +71,11 @@ class PipeSabrSpec(info: YoutubeSabrInfo) {
     /**
      * The format each track starts on.
      *
-     * SABR requires a concrete selection up front to open the session; the
-     * player can switch later. Highest bitrate audio and highest resolution
-     * video, matching the order the extractor already sorts them in.
+     * SABR requires a concrete selection up front to open the session, and
+     * that selection is the *only* one the session can serve — a manifest is
+     * built from it, and `PipeSabrManifest.usable` advertises nothing else.
+     * So this is not a starting guess that a player refines later; it is the
+     * quality the video will play at.
      */
     fun bootstrapAudio(): YoutubeSabrInfo.Format? {
         var best: YoutubeSabrInfo.Format? = null
@@ -85,14 +87,34 @@ class PipeSabrSpec(info: YoutubeSabrInfo) {
         return best
     }
 
-    fun bootstrapVideo(): YoutubeSabrInfo.Format? {
+    /**
+     * The video format to open on, no taller than [maxHeight].
+     *
+     * **Uncapped means the highest available, and that is rarely what a phone
+     * wants.** A 4K source opened uncapped streams 2160p onto a handset that
+     * may not decode it, over a data plan that certainly did not ask for it, so
+     * a host with any opinion about quality should say so. 0 or a negative
+     * value means no cap, which is the old behaviour and stays the default —
+     * a library capping quality silently would be its own surprise.
+     *
+     * When every format is taller than the cap, the **shortest** one wins
+     * rather than nothing: a 1080p-only video asked for 720p should play at
+     * 1080p, not fail.
+     */
+    @JvmOverloads
+    fun bootstrapVideo(maxHeight: Int = 0): YoutubeSabrInfo.Format? {
         var best: YoutubeSabrInfo.Format? = null
+        var smallest: YoutubeSabrInfo.Format? = null
         for (format in videoFormats) {
+            if (smallest == null || format.height < smallest.height) {
+                smallest = format
+            }
+            if (maxHeight > 0 && format.height > maxHeight) continue
             if (best == null || format.height > best.height) {
                 best = format
             }
         }
-        return best
+        return best ?: smallest
     }
 
     fun putInitializationData(format: YoutubeSabrInfo.Format, data: ByteArray) {

@@ -114,11 +114,17 @@ open class PipePlugin : Plugin() {
             call.getString("contentCountry"),
         )
         val startPositionMs: Long = call.getInt("startPositionMs", 0)!!.toLong()
+        /*
+         * The cap is a real selection, not a hint: SABR opens on one format and
+         * the session serves only that one, so this is the height the video
+         * plays at. 0 keeps the old behaviour — the tallest format there is.
+         */
+        val maxHeight: Int = call.getInt("maxHeight", 0)!!
 
         executor.execute {
             try {
                 val manager = sabrManager(engine)
-                val session = manager.open(request, startPositionMs)
+                val session = manager.open(request, startPositionMs, maxHeight)
 
                 val result = JSObject()
                 result.put("success", true)

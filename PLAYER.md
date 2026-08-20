@@ -87,6 +87,29 @@ suits badly: the `startPositionMs` for a reload at another quality, or a last
 write as a page unmounts. It resolves zeroes when nothing is loaded rather than
 rejecting.
 
+## SABR sessions
+
+`load()` takes an open session directly, which is the shortest route between
+capacitor-pipe's two halves:
+
+```ts
+const { sessionId } = await Pipe.openSabrSession({ videoUrl, maxHeight: 720 });
+await PipePlayer.load({ sessionId, startPositionMs: resumeAt });
+```
+
+The same session plays by passing its `manifestUrl` as `url` — identical media,
+because both routes read the one synthesised manifest. This one skips the
+loopback socket, the cleartext exemption its address needs, and an HTTP copy of
+every segment. Prefer it whenever the player is this one; keep the URL route for
+web players, which is what it exists for.
+
+**Close the session when playback ends, not when `load()` resolves.** A session
+holds a minted token, a listening socket and a spool directory, and the player
+reads from it for as long as the video is on screen.
+
+One quality per session — see the README. To change it, close, reopen with a new
+`maxHeight`, and `load` again with the current position.
+
 ## Offline files
 
 `load()` takes either a `url` or an `offline` source, never both and never
@@ -356,18 +379,18 @@ this is how a host says "I am navigating away but keep playing".
 ### load(...)
 
 ```typescript
-load(options: { url?: string; offline?: OfflineSource; startPositionMs?: number; }) => any
+load(options: { url?: string; offline?: OfflineSource; sessionId?: string; startPositionMs?: number; }) => any
 ```
 
 Load media and prepare it. Does not start playback.
 
-Exactly one of `url` and `offline`. Passing both, or neither, rejects —
-there is no implicit fallback, because a silent fall back to the network
-would hide a broken download behind a data charge.
+Exactly one of `url`, `offline` and `sessionId`. Passing more than one, or
+none, rejects — there is no implicit fallback, because a silent fall back
+to the network would hide a broken download behind a data charge.
 
-| Param         | Type                                                                                                           |
-| ------------- | -------------------------------------------------------------------------------------------------------------- |
-| **`options`** | <code>{ url?: string; offline?: <a href="#offlinesource">OfflineSource</a>; startPositionMs?: number; }</code> |
+| Param         | Type                                                                                                                               |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ url?: string; offline?: <a href="#offlinesource">OfflineSource</a>; sessionId?: string; startPositionMs?: number; }</code> |
 
 **Returns:** <code>any</code>
 
