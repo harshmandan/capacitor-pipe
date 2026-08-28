@@ -73,6 +73,13 @@ all**. That window is real and long: a `dock()` normally lands before the
 the full play/pause/seek chrome centred over an empty surface there read as
 the player being broken rather than the video arriving.
 
+The corner mini player is the exception: its compact chrome — close, expand,
+play/pause — stays available over the spinner. The close button is the only way
+out of a floating window, and a load that never resolves (a stalled extraction,
+a dead network) otherwise left a spinner nothing could dismiss short of killing
+the app. The failure was observed on a real device (2026-08-28); the
+chrome-over-spinner behaviour itself is device-unverified.
+
 Readiness is **latched per load**, not mirrored from the playback state: a
 mid-play rebuffer (a seek, a stall) shows the spinner over the video but never
 strips the chrome back off. Every `load()` — including the reload that a seek
@@ -246,14 +253,21 @@ native rather than a `<video>` tag.
 The consequence: **every page that wants the player must `dock()` on mount and
 `undock()` on unmount.** A rect measured on one page is meaningless on the next.
 
-**`undock()` with media loaded enters mini mode itself.** The mode and the rect
-are one state, owned here: before this, the surface fell back to drawing at
-the corner rect while the `mini` flag stayed wherever the last button press
+**`undock()` enters mini mode itself — media loaded or not.** The mode and the
+rect are one state, owned here: before this, the surface fell back to drawing
+at the corner rect while the `mini` flag stayed wherever the last button press
 left it — undock a full-size player and you got a corner-sized video wearing
 the full docked chrome, immovable (the corner drag only arms in mini) and
-answering the swipe-up fullscreen gesture. Now no-rect-claimed and mini agree
-by construction; a host never needs `setMini(true)` next to its `undock()`.
-Device-unverified.
+answering the swipe-up fullscreen gesture. The same half-state reappeared when
+a host undocked while its load was still in flight (back pressed during
+extraction), which is why the original media-loaded guard is gone. And the
+surface no longer trusts the flag alone: whenever no rect is claimed, the box
+IS the corner window — compact chrome, rounded corners, corner drag, no
+fullscreen gesture — whatever the mini axis says, and `dock()` re-aligns a
+mini axis left mid-travel with the docked mode it arrives in. A host never
+needs `setMini(true)` next to its `undock()`. The rect-keyed presentation and
+the re-alignment are device-unverified; the half-state they close was observed
+live.
 
 **Mini transitions are serialised, and the chrome hides while one runs.**
 `undock()` and `setMini()` animate the same axis, and each used to fire its own
@@ -352,10 +366,19 @@ strip, so play/pause goes into that strip as a RemoteAction instead.
 
 The close button is the corner window's one irreversible control, kept
 top-right where every floating window puts it and away from the two bottom
-buttons. Pressing it emits `closed` and then the player releases **itself** —
-surface down, playback stopped, PiP disarmed — so it works even if no listener
-is registered. The event is the host's cue to end what only it owns: an open
-SABR session, a download pin, whatever record says a video floats.
+buttons. By default, pressing it emits `closed` and then the player releases
+**itself** — surface down, playback stopped, PiP disarmed — so it works even
+if no listener is registered. The event is the host's cue to end what only it
+owns: an open SABR session, a download pin, whatever record says a video
+floats.
+
+A host can take the decision instead: `configure({ handleClose: true })` makes
+the X emit `closeRequested` and nothing else. That exists because "close" is
+ambiguous while the page that owns the video is on screen — the user usually
+means "put it back", not "kill the lecture". The host answers by re-docking
+(`dock()` + `setMini(false)`) when the owning page is mounted, or by calling
+`release()` anywhere else. Opting in and not answering leaves the X inert;
+that is the contract the flag signs. Device-unverified.
 
 Known rough edge: the system's own PiP controls appear over ours on tap.
 
@@ -735,6 +758,7 @@ progress writes on the event and needs no timer of its own.
 | **`qualities`**        | <code>{}</code>                                       | Rows for the quality sheet. Unlike speed, the player *cannot* apply this — which track to use is an extraction decision, not a playback one. It emits `qualitySelected` and leaves you to reload at the chosen level.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **`pip`**              | <code>boolean</code>                                  | Allow Picture-in-Picture. Off unless asked for. **This alone is not enough.** PiP shrinks the host's entire window, so the host must also declare it on its own Activity — a plugin's manifest cannot merge into an activity whose name it does not know: ```xml &lt;activity android:name=".MainActivity" android:supportsPictureInPicture="true" android:configChanges="screenSize\|smallestScreenSize\|screenLayout\|orientation" /&gt; ``` It also needs `androidx.core:core-pip` on your classpath — check `corePipAvailable`. With both in place the system enters PiP by itself when the user leaves the app, on **every** supported version: the library reaches `onUserLeaveHint` through `ComponentActivity` on Android 8–11 and auto-enter on 12+, so there is nothing version-specific for you to write. Pin `core-pip` to `1.0.0-alpha02`. alpha03 requires AGP 9.1.0, which Capacitor 8 apps do not ship — see docs/PLAYER.md. |
 | **`secure`**           | <code>boolean</code>                                  | Block screenshots and screen recording (`FLAG_SECURE`). A **window** flag, not a view one, so it necessarily covers the host's page too — there is no way to secure only the video. It also blanks the recents thumbnail and the PiP window, and on some devices disables casting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **`handleClose`**      | <code>boolean</code>                                  | The corner close button asks you instead of acting. Off by default: the X emits `closed` and the player releases itself, so it works even with no listener registered. Turned on, the X emits `closeRequested` and nothing else — you answer it: re-dock the video into its owning page (`dock()` + `setMini(false)`) when it is on screen, `release()` when it is not. Opting in and not answering leaves the X inert.                                                                                                                                                                                                                       |
 | **`button`**           | <code><a href="#playerbutton">PlayerButton</a></code> | One custom control, placed after speed and quality. Exactly one, deliberately: a variable number would shuffle the fixed buttons around and cost them their stable position.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 
@@ -770,7 +794,7 @@ Emitted when a control the host owns is tapped.
 
 | Prop           | Type                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`action`**   | <code>string</code> | One of: - `speed` / `quality` — the button was tapped and a sheet opened - `speedSelected` / `qualitySelected` — a row was chosen; `buttonId` is its id - `minimise` — shrunk to the corner; the player keeps playing - `expand` — left the corner window or PiP - `expandUnavailable` — expand was pressed with no rect claimed on this page. Route back to the page that owns the video; see docs/PLAYER.md. - `closed` — the corner mini player's close button. The player has already released itself when this arrives; the host's job is its OWN state — a SABR session, a download pin, whatever record says a video floats. - `previous` / `next` — queue controls, if you enabled them - `button` — your custom control; `buttonId` is its id |
+| **`action`**   | <code>string</code> | One of: - `speed` / `quality` — the button was tapped and a sheet opened - `speedSelected` / `qualitySelected` — a row was chosen; `buttonId` is its id - `minimise` — shrunk to the corner; the player keeps playing - `expand` — left the corner window or PiP - `expandUnavailable` — expand was pressed with no rect claimed on this page. Route back to the page that owns the video; see docs/PLAYER.md. - `closed` — the corner mini player's close button. The player has already released itself when this arrives; the host's job is its OWN state — a SABR session, a download pin, whatever record says a video floats. - `closeRequested` — the same button with `handleClose` on. The player has done NOTHING: answer by re-docking the video into its owning page (`dock()` + `setMini(false)`) or by calling `release()`. - `previous` / `next` — queue controls, if you enabled them - `button` — your custom control; `buttonId` is its id |
 | **`buttonId`** | <code>string</code> | The id of the button or the selected row, depending on `action`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 

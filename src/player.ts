@@ -226,6 +226,18 @@ export interface PlayerConfig {
    */
   secure?: boolean;
   /**
+   * The corner close button asks you instead of acting.
+   *
+   * Off by default: the X emits `closed` and the player releases itself, so it
+   * works even with no listener registered. Turned on, the X emits
+   * `closeRequested` and nothing else — you answer it, because "close" is
+   * ambiguous while the page that owns the video is on screen: re-dock the
+   * video into that page (`dock()` + `setMini(false)`) when it is, `release()`
+   * when it is not. Opting in and not answering leaves the X inert; that is
+   * the contract you sign by opting in.
+   */
+  handleClose?: boolean;
+  /**
    * One custom control, placed after speed and quality.
    *
    * Exactly one, deliberately: a variable number would shuffle the fixed
@@ -248,6 +260,9 @@ export interface PlayerActionEvent {
    * - `closed` — the corner mini player's close button. The player has already
    *   released itself when this arrives; the host's job is its OWN state — a
    *   SABR session, a download pin, whatever record says a video floats.
+   * - `closeRequested` — the same button with `handleClose` on. The player has
+   *   done NOTHING: answer by re-docking the video into its owning page
+   *   (`dock()` + `setMini(false)`) or by calling `release()`.
    * - `previous` / `next` — queue controls, if you enabled them
    * - `button` — your custom control; `buttonId` is its id
    */

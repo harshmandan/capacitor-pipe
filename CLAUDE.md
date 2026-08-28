@@ -584,6 +584,38 @@ those tags show up literally in quick-docs and Dokka. Use blank lines, `**bold**
 fenced blocks and `[Symbol]` links. `@param` and `@return` are genuine KDoc tags
 and stay.
 
+### 27. Window insets are a second position source — pad the chrome in fullscreen only
+
+The docked chrome once carried `windowInsetsPadding(WindowInsets.displayCutout)`
+unconditionally, believed free because Compose insets are positional and the
+docked box sits nowhere near the cutout. That belief holds only while the
+window keeps its shape. A host that allows rotation can let the window flip to
+landscape for a moment (sensor noise, an unlock window) while the box — placed
+by the MEASURED geometry, which stays correct across the flip — remains where
+the portrait page put it. The box then overlaps the landscape cutout region,
+and the entire chrome, scrim included, pads itself sideways by the cutout
+height while the video underneath does not move. On device: chrome shifted
+right by exactly the cutout (~170px), an unscrimmed strip of video at the left
+edge, the offset wandering as the window flipped back — which read as a stale
+drag translation and burned a day pointed at the mini player.
+
+The rule: the box's position comes from `PipePlayerGeometry` and from nothing
+else. Window-derived insets may only be applied when the box actually spans the
+window — fullscreen (and PiP, which uses the compact chrome and takes no
+insets). Anything inside a docked or corner box must lay out against the box.
+
+### 28. Capacitor's `PluginCall.getLong` cannot read a JavaScript number
+
+Its implementation returns the stored object only `if (value instanceof Long)`
+— and a number sent from JS lands in the bridge's JSONObject as an Integer or
+a Double, never a Long. So `call.getLong("startPositionMs") ?: 0L` compiled,
+looked idiomatic beside `getString`/`getBoolean`, and silently turned EVERY
+start position a web caller sent into 0 — resume points, highlight seeks,
+quality-switch positions, on all three load paths. Found on device as "a 33s
+seek that reloads and lands at 0:00", diagnosed as everything except a parse
+bug first. `getInt`, `getFloat` and `getDouble` do convert; `getLong` alone
+does not. Read longs as `(call.data.opt(name) as? Number)?.toLong()`.
+
 ---
 
 # Architecture

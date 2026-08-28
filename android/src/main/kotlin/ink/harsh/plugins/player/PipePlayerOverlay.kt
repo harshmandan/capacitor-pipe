@@ -203,6 +203,7 @@ class PipePlayerOverlay(private val activity: Activity) {
      * glitch rather than a move.
      */
     private fun driveMini(value: Boolean) {
+        Log.i(TAG, "driveMini $value (axis=${motion.miniProgress.value} mini=${mini.value})")
         mini.value = value
         miniJob?.cancel()
         miniJob = uiScope.launch {
@@ -302,6 +303,19 @@ class PipePlayerOverlay(private val activity: Activity) {
 
     /** Raised when a consumer-supplied button, or quality/speed, is tapped. */
     var onChromeEvent: ((String, String?) -> Unit)? = null
+
+    /**
+     * The corner close button asks the host instead of releasing itself.
+     *
+     * Off by default, which keeps the original guarantee — the X works with no
+     * listener registered. A host that turns it on (configure `handleClose`)
+     * gets `closeRequested` instead of `closed`, and answers by re-docking the
+     * video into the page that owns it, or by calling release(). Exists
+     * because "close" is ambiguous while the owning page is on screen: killing
+     * a lecture the student meant to put back where it was is worse than
+     * asking.
+     */
+    var handleCloseRequests: Boolean = false
 
     /**
      * Raised as playback moves, so a host can record where the viewer got to.
@@ -507,21 +521,33 @@ class PipePlayerOverlay(private val activity: Activity) {
             },
             onExtraButton = { id -> onChromeEvent?.invoke("button", id) },
             onClose = {
-                /*
-                 * The mini player's one irreversible control. The event goes
-                 * out FIRST, while the bridge still has a live overlay to
-                 * describe; then the player tears itself down — the host must
-                 * not be required to listen for the surface to come down,
-                 * because a close button that only works when JS cooperates is
-                 * a close button that sometimes does nothing. What the host
-                 * DOES own is its own state: an open SABR session, a download
-                 * pin, a "this video floats" record — `closed` is its cue.
-                 */
-                onChromeEvent?.invoke("closed", null)
-                // Posted, not inline: release() disposes the very ComposeView
-                // whose click handler is running, and tearing a view down from
-                // inside its own input dispatch is asking for trouble.
-                uiScope.launch { release() }
+                if (handleCloseRequests) {
+                    /*
+                     * The host asked to answer the close itself. Nothing is
+                     * torn down here: the host decides whether the X means
+                     * "put the video back in my page" (dock + setMini(false))
+                     * or "stop" (release()). A host that opts in and then
+                     * fails to answer leaves the X inert — that is the
+                     * contract it signed by opting in.
+                     */
+                    onChromeEvent?.invoke("closeRequested", null)
+                } else {
+                    /*
+                     * The mini player's one irreversible control. The event goes
+                     * out FIRST, while the bridge still has a live overlay to
+                     * describe; then the player tears itself down — the host must
+                     * not be required to listen for the surface to come down,
+                     * because a close button that only works when JS cooperates is
+                     * a close button that sometimes does nothing. What the host
+                     * DOES own is its own state: an open SABR session, a download
+                     * pin, a "this video floats" record — `closed` is its cue.
+                     */
+                    onChromeEvent?.invoke("closed", null)
+                    // Posted, not inline: release() disposes the very ComposeView
+                    // whose click handler is running, and tearing a view down from
+                    // inside its own input dispatch is asking for trouble.
+                    uiScope.launch { release() }
+                }
             },
             onSeek = { ms -> player?.seekTo(ms) },
         )
@@ -698,6 +724,23 @@ class PipePlayerOverlay(private val activity: Activity) {
         if (dockRect.value != rect) geometryChangedAt = android.os.SystemClock.uptimeMillis()
         dockRect.value = rect
         Log.i(TAG, "docked at $rect")
+
+        /*
+         * Re-align the mini axis with the mode, without changing the mode.
+         *
+         * `dock()` alone deliberately does not leave mini — a rect appearing is
+         * a page mounting, not a request to expand. But when the flag already
+         * says DOCKED and the axis disagrees (a transition cancelled mid-travel,
+         * a driveMini that never ran), the box would render at the lerped
+         * position between the rect and the corner: chrome displaced from the
+         * video, at an offset that varies with wherever the axis stopped.
+         * Driving it home here makes a claimed rect and a docked flag agree by
+         * construction. A no-op when the axis is already at rest.
+         */
+        if (attached && !mini.value && motion.miniProgress.value > 0.001f) {
+            Log.i(TAG, "dock realigning mini axis from ${motion.miniProgress.value}")
+            driveMini(false)
+        }
     }
 
     fun undock() {
@@ -716,13 +759,22 @@ class PipePlayerOverlay(private val activity: Activity) {
          * leaving — minimise-then-navigate never showed it because the
          * minimise button had already set the flag.
          *
-         * Guarded to the case it is for: an attached player with media that is
-         * not already mini and not in PiP (there the system owns the window).
-         * The collapse runs first for the same reason setMini's does — a
-         * fullscreen player travelling diagonally to the corner while
-         * shrinking reads as a glitch. Device-unverified.
+         * Guarded to the case it is for: an attached player that is not already
+         * mini and not in PiP (there the system owns the window). The collapse
+         * runs first for the same reason setMini's does — a fullscreen player
+         * travelling diagonally to the corner while shrinking reads as a
+         * glitch.
+         *
+         * Deliberately NOT guarded on media being loaded any more. A host can
+         * undock while its load is still in flight — back pressed during
+         * extraction — and the surface draws the corner box (spinner and all)
+         * whenever no rect is claimed, so skipping the mode flip there produced
+         * a corner-sized box wearing the docked rules: full chrome, the
+         * swipe-up fullscreen gesture, no corner drag. Observed live. If the
+         * host means to abandon the load it calls release(), which tears the
+         * box down entirely.
          */
-        if (attached && !mini.value && !inPip.value && (player?.mediaItemCount ?: 0) > 0) {
+        if (attached && !mini.value && !inPip.value) {
             driveMini(true)
         }
     }
@@ -1245,7 +1297,19 @@ class PipePlayerOverlay(private val activity: Activity) {
         if (measured != geometry.value) {
             geometry.value = measured
             geometryChangedAt = android.os.SystemClock.uptimeMillis()
-            Log.i(TAG, "geom pip=${inPip.value} $measured")
+            /*
+             * `req` and `cfg` are diagnosis, not decoration. A geometry that
+             * flips between portrait and landscape frames while the device sits
+             * still means SOMEONE is rotating the Activity — and which someone
+             * is unreadable from the geometry alone. requestedOrientation names
+             * the current ask (UNSPECIFIED = the host unlocked rotation and the
+             * sensor governs); the configuration names what actually landed.
+             */
+            Log.i(
+                TAG,
+                "geom pip=${inPip.value} req=${activity.requestedOrientation} " +
+                    "cfg=${activity.resources.configuration.orientation} $measured",
+            )
         }
     }
 
@@ -1439,6 +1503,7 @@ class PipePlayerOverlay(private val activity: Activity) {
     fun load(url: String, startPositionMs: Long = 0L) {
         resetForNewMedia()
         playingOffline = false
+        Log.i(TAG, "load url start=$startPositionMs")
         ensurePlayer().apply {
             setMediaItem(MediaItem.fromUri(url), startPositionMs)
             prepare()
@@ -1478,6 +1543,7 @@ class PipePlayerOverlay(private val activity: Activity) {
         val media = PipePlayerOffline.buildMediaSource(activity, source)
         resetForNewMedia()
         playingOffline = true
+        Log.i(TAG, "loadOffline start=$startPositionMs tracks=${source.tracks.size}")
         ensurePlayer().apply {
             setMediaSource(media, startPositionMs)
             prepare()
@@ -1539,8 +1605,11 @@ class PipePlayerOverlay(private val activity: Activity) {
          */
         extraButton: PipePlayerExtraButton?,
         extraButtonProvided: Boolean,
+        /** Null keeps the current close policy, like every other field. */
+        handleClose: Boolean? = null,
     ) {
         accentColor?.let { accent.value = Color(it) }
+        handleClose?.let { handleCloseRequests = it }
         mini?.let { this.miniConfig.value = it }
         showPreviousNext?.let { this.showPreviousNext.value = it }
         title?.let { this.title.value = it }

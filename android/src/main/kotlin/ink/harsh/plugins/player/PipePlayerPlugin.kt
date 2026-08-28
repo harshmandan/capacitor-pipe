@@ -357,6 +357,7 @@ open class PipePlayerPlugin : Plugin() {
                 qualities = sheetOptions(call, "qualities"),
                 extraButton = button,
                 extraButtonProvided = buttonProvided,
+                handleClose = call.getBoolean("handleClose"),
             )
             call.resolve()
         }
@@ -416,7 +417,19 @@ open class PipePlayerPlugin : Plugin() {
             PipeLoadRequest.parse(
                 url = call.getString("url"),
                 offline = call.getObject("offline"),
-                startPositionMs = call.getLong("startPositionMs") ?: 0L,
+                /*
+                 * NOT call.getLong(). Capacitor's getLong returns the stored
+                 * object only `if (value instanceof Long)` — and a JavaScript
+                 * number lands in the JSONObject as an Integer or a Double, so
+                 * getLong answered null for EVERY value a web caller could
+                 * possibly send. The `?: 0L` then swallowed it: every
+                 * startPositionMs ever passed — resume points, highlight
+                 * seeks, quality-switch positions — silently became 0, on all
+                 * three load paths. Found on device: a 33s seek that reloaded
+                 * and landed at 0:00. Number-and-convert accepts whatever
+                 * numeric type the bridge chose.
+                 */
+                startPositionMs = (call.data.opt("startPositionMs") as? Number)?.toLong() ?: 0L,
                 sessionId = call.getString("sessionId"),
             )
         } catch (invalid: Exception) {

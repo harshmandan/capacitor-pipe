@@ -271,6 +271,21 @@ internal fun PipePlayerSurface(
         val m = if (pip) 0f else motion.miniProgress.value
 
         /*
+         * The box IS the corner window whenever no rect is claimed — whatever
+         * the mini axis says. `base = docked ?: corner` already draws it there,
+         * but everything presentational used to key off `m` alone, so a mini
+         * axis left at 0 while undocked (a cancelled transition, a skipped
+         * driveMini) produced a corner-sized box wearing the DOCKED rules:
+         * square corners, the full chrome squeezed into it, the swipe-up
+         * fullscreen gesture armed, the corner drag not. Observed live as an
+         * undismissable floating box. The rect is the one source of truth for
+         * where the box is, so the presentation and the gestures follow the
+         * same fact rather than trusting a second flag to agree with it.
+         */
+        val cornered = mini || (hostRect == null && !pip)
+        val cornerness = if (hostRect == null && !pip) 1f else m
+
+        /*
          * Two axes, applied in order: first travel from the docked rect toward
          * the corner, then from wherever that is toward fullscreen. They are
          * mutually exclusive in practice — going mini drives fullscreen to 0
@@ -486,7 +501,7 @@ internal fun PipePlayerSurface(
          * half-rotated window, with `committed` already latched. While the
          * choreography runs there is simply nothing to drag.
          */
-        val collapseDraggable = !mini && !pip && !motion.transitioning &&
+        val collapseDraggable = !cornered && !pip && !motion.transitioning &&
             (screenDragging || !atDockedRest) && !boxDragging
 
         /*
@@ -607,7 +622,7 @@ internal fun PipePlayerSurface(
                      * receiving events; collapsing shrinks the box away and is
                      * handled by the screen-sized node instead.
                      */
-                    enabled = !mini && !pip && !motion.transitioning &&
+                    enabled = !cornered && !pip && !motion.transitioning &&
                         (boxDragging || atDockedRest),
                     onDragStarted = {
                         boxDragging = true
@@ -661,8 +676,8 @@ internal fun PipePlayerSurface(
                  * is keeping a pinch-zoomed video inside the player's bounds.
                  */
                 .shadow(
-                    elevation = if (pip) 0.dp else 14.dp * m,
-                    shape = RoundedCornerShape(if (pip) 0.dp else 12.dp * m),
+                    elevation = if (pip) 0.dp else 14.dp * cornerness,
+                    shape = RoundedCornerShape(if (pip) 0.dp else 12.dp * cornerness),
                     clip = true,
                 )
                 .background(Color.Black)
@@ -679,8 +694,8 @@ internal fun PipePlayerSurface(
                  * layout — the margins exist to clear the host's own chrome, and
                  * only the corners honour them.
                  */
-                .pointerInput(mini, miniConfig, screenW, screenH) {
-                    if (!mini || !miniConfig.draggable) return@pointerInput
+                .pointerInput(cornered, miniConfig, screenW, screenH) {
+                    if (!cornered || !miniConfig.draggable) return@pointerInput
                     detectDragGestures(
                         onDragEnd = {
                             /*
@@ -960,7 +975,7 @@ internal fun PipePlayerSurface(
                         state = transformState,
                         canPan = { false },
                         lockRotationOnZoomPan = true,
-                        enabled = !mini && !pip,
+                        enabled = !cornered && !pip,
                     )
                     /*
                      * Keyed on `live` as well as `mini`. pointerInput does not
@@ -969,7 +984,7 @@ internal fun PipePlayerSurface(
                      * stream that goes live after the detector started would
                      * still be judged against the liveness captured back then.
                      */
-                    .pointerInput(mini, pip, chromeState.live, chromeState.playing) {
+                    .pointerInput(cornered, pip, chromeState.live, chromeState.playing) {
                         detectTapGestures(
                             onTap = {
                                 if (pip) return@detectTapGestures
@@ -986,7 +1001,7 @@ internal fun PipePlayerSurface(
                                 controlsVisible = !controlsVisible
                             },
                             onDoubleTap = { offset ->
-                                if (mini || pip) return@detectTapGestures
+                                if (cornered || pip) return@detectTapGestures
                                 val forward = offset.x > size.width / 2f
                                 // Accumulate against the burst still on screen;
                                 // reversing direction restarts the count.
@@ -1009,7 +1024,7 @@ internal fun PipePlayerSurface(
                                 onSeekBy(if (forward) 10_000L else -10_000L)
                             },
                             onLongPress = {
-                                if (mini || pip) return@detectTapGestures
+                                if (cornered || pip) return@detectTapGestures
                                 // Live has no buffer ahead of the play head, so
                                 // there is nothing to play faster THROUGH: the
                                 // rate would climb, hit the live edge and stall.
@@ -1067,7 +1082,7 @@ internal fun PipePlayerSurface(
                  * illegible at that size, so waiting until the animation lands
                  * would show a squashed set of controls for the whole journey.
                  */
-                val compact = m > 0.5f || pip
+                val compact = cornerness > 0.5f || pip
 
                 /*
                  * NO chrome at all while the box travels the mini axis.
@@ -1113,7 +1128,18 @@ internal fun PipePlayerSurface(
                 }
 
                 AnimatedVisibility(
-                    visible = ready && compact && !travellingChromeHidden &&
+                    /*
+                     * NOT gated on `ready`, unlike the full chrome. The loading
+                     * presentation exists because a full control set centred
+                     * over an empty box reads as broken — but the corner window
+                     * is different: its close button is the only way OUT, and a
+                     * load that never resolves (extraction stalled, network
+                     * gone) left a spinner the user could not dismiss except by
+                     * killing the app. Observed live. The compact set is three
+                     * corner buttons and a hairline, which read fine over a
+                     * spinner.
+                     */
+                    visible = compact && !travellingChromeHidden &&
                         (pip || controlsVisible),
                     enter = fadeIn(),
                     exit = fadeOut(),

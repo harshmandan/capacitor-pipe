@@ -169,17 +169,38 @@ internal fun PipePlayerChrome(
         modifier
             .fillMaxSize()
             /*
-             * Keep the chrome out of the display cutout.
+             * Keep the chrome out of the display cutout — in FULLSCREEN only.
              *
              * In landscape the title sat flush against the screen edge and lost
              * its first letter. This is the official inset for that, and it is
              * zero on devices without a cutout, so it costs nothing elsewhere.
              *
+             * Fullscreen-only is load-bearing, not an optimisation. Compose
+             * insets are positional — a window inset is applied only where the
+             * composable overlaps the inset region — so this line was believed
+             * free for the docked player, which sits well below the cutout. It
+             * is not free the moment the WINDOW changes shape under the box: the
+             * host may allow rotation, and during a transient landscape pass the
+             * docked box (still correctly placed by the measured geometry)
+             * suddenly overlaps the left cutout region, and the entire chrome —
+             * scrim included — pads itself sideways by the cutout height while
+             * the video underneath stays put. Measured on device: chrome shifted
+             * right by exactly the cutout (~170px), an unscrimmed strip of video
+             * on the left, and the offset wandering as the window flipped back.
+             * Docked and mini boxes live inside the content area and never need
+             * the inset; fullscreen genuinely spans the window and does.
+             *
              * Note what it does NOT cover: rounded display corners have no inset
              * to ask for below API 31, so `edge` still carries a margin of its
              * own. Between the two, the title clears both.
              */
-            .windowInsetsPadding(WindowInsets.displayCutout)
+            .then(
+                if (state.fullscreen) {
+                    Modifier.windowInsetsPadding(WindowInsets.displayCutout)
+                } else {
+                    Modifier
+                },
+            )
             .background(
                 Brush.verticalGradient(
                     0f to Color.Black.copy(alpha = 0.45f),
