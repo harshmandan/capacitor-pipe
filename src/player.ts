@@ -245,6 +245,9 @@ export interface PlayerActionEvent {
    * - `expand` — left the corner window or PiP
    * - `expandUnavailable` — expand was pressed with no rect claimed on this
    *   page. Route back to the page that owns the video; see docs/PLAYER.md.
+   * - `closed` — the corner mini player's close button. The player has already
+   *   released itself when this arrives; the host's job is its OWN state — a
+   *   SABR session, a download pin, whatever record says a video floats.
    * - `previous` / `next` — queue controls, if you enabled them
    * - `button` — your custom control; `buttonId` is its id
    */

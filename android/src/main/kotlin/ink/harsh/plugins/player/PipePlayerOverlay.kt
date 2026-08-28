@@ -181,6 +181,37 @@ class PipePlayerOverlay(private val activity: Activity) {
     private val mini = mutableStateOf(false)
 
     /**
+     * The one in-flight mini transition. A newer request replaces it wholesale.
+     *
+     * [undock] and [setMini] both animate the same axis, and each used to fire
+     * its own `uiScope.launch`. The launches are FIFO but their suspensions
+     * interleave: undock's collapse-then-travel could still be waiting on the
+     * collapse when a host's `setMini(false)` ran to completion — and undock's
+     * `animateMini(true)` then landed LAST, parking the video at (or on the way
+     * to) the corner while the `mini` flag said docked. That half-state is
+     * exactly what re-docking a floating video produces: the host undocks one
+     * page, and docks + expands on the next within the same few frames. One
+     * owned job means the newest intent always finishes the argument.
+     */
+    private var miniJob: kotlinx.coroutines.Job? = null
+
+    /**
+     * The single writer for the mini mode: flag and animation move together.
+     *
+     * Collapsing out of fullscreen runs first when entering — a fullscreen
+     * player travelling diagonally to the corner while shrinking reads as a
+     * glitch rather than a move.
+     */
+    private fun driveMini(value: Boolean) {
+        mini.value = value
+        miniJob?.cancel()
+        miniJob = uiScope.launch {
+            if (value) motion.animateTo(false)
+            motion.animateMini(value)
+        }
+    }
+
+    /**
      * Which options sheet is open, if any.
      *
      * Held here, not in the surface: the sheet is mounted in its own
@@ -475,6 +506,23 @@ class PipePlayerOverlay(private val activity: Activity) {
                 onChromeEvent?.invoke("speed", null)
             },
             onExtraButton = { id -> onChromeEvent?.invoke("button", id) },
+            onClose = {
+                /*
+                 * The mini player's one irreversible control. The event goes
+                 * out FIRST, while the bridge still has a live overlay to
+                 * describe; then the player tears itself down — the host must
+                 * not be required to listen for the surface to come down,
+                 * because a close button that only works when JS cooperates is
+                 * a close button that sometimes does nothing. What the host
+                 * DOES own is its own state: an open SABR session, a download
+                 * pin, a "this video floats" record — `closed` is its cue.
+                 */
+                onChromeEvent?.invoke("closed", null)
+                // Posted, not inline: release() disposes the very ComposeView
+                // whose click handler is running, and tearing a view down from
+                // inside its own input dispatch is asking for trouble.
+                uiScope.launch { release() }
+            },
             onSeek = { ms -> player?.seekTo(ms) },
         )
 
@@ -623,6 +671,10 @@ class PipePlayerOverlay(private val activity: Activity) {
         mini.value = false
         mediaReady.value = false
         buffering.value = false
+        // A mini transition still animating would write the axis AFTER the
+        // reset below and resurrect the state the detach exists to clear.
+        miniJob?.cancel()
+        miniJob = null
         uiScope.launch { motion.reset() }
 
         composeView?.let { view ->
@@ -671,11 +723,7 @@ class PipePlayerOverlay(private val activity: Activity) {
          * shrinking reads as a glitch. Device-unverified.
          */
         if (attached && !mini.value && !inPip.value && (player?.mediaItemCount ?: 0) > 0) {
-            mini.value = true
-            uiScope.launch {
-                motion.animateTo(false)
-                motion.animateMini(true)
-            }
+            driveMini(true)
         }
     }
 
@@ -767,14 +815,7 @@ class PipePlayerOverlay(private val activity: Activity) {
             onChromeEvent?.invoke("expandUnavailable", null)
             return
         }
-        mini.value = value
-        uiScope.launch {
-            // Collapse out of fullscreen FIRST, then travel to the corner.
-            // Running both at once sends the player diagonally across the screen
-            // while shrinking, which reads as a glitch rather than a move.
-            if (value) motion.animateTo(false)
-            motion.animateMini(value)
-        }
+        driveMini(value)
     }
 
     /**

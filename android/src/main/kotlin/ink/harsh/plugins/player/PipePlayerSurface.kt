@@ -1070,6 +1070,29 @@ internal fun PipePlayerSurface(
                 val compact = m > 0.5f || pip
 
                 /*
+                 * NO chrome at all while the box travels the mini axis.
+                 *
+                 * The box is mid-way between the docked rect and the corner
+                 * there — roughly half size — and either chrome laid out in it
+                 * reads as the player broken at half height rather than as a
+                 * window in motion: the full set squeezed into a shrinking box
+                 * on the way out, the compact set stretched across a growing
+                 * one on the way back. The video travels bare, as a moved
+                 * window should, and whichever chrome fits the destination
+                 * fades in on arrival. Same idea as `transitioning` on the
+                 * fullscreen axis. Derived, so composition is invalidated when
+                 * the answer changes, not on every frame of the travel. PiP is
+                 * exempt: the system is animating the window itself, and the
+                 * axis is pinned there anyway.
+                 */
+                val miniTravelling by remember {
+                    derivedStateOf {
+                        motion.miniProgress.value > 0.01f && motion.miniProgress.value < 0.99f
+                    }
+                }
+                val travellingChromeHidden = miniTravelling && !pip
+
+                /*
                  * The spinner, over the video and under the chrome.
                  *
                  * Two reasons to spin: the media has never been ready (the
@@ -1090,7 +1113,8 @@ internal fun PipePlayerSurface(
                 }
 
                 AnimatedVisibility(
-                    visible = ready && compact && (pip || controlsVisible),
+                    visible = ready && compact && !travellingChromeHidden &&
+                        (pip || controlsVisible),
                     enter = fadeIn(),
                     exit = fadeOut(),
                 ) {
@@ -1113,7 +1137,8 @@ internal fun PipePlayerSurface(
                      * Hidden instantly rather than faded, because a fade is
                      * itself visible at this length.
                      */
-                    visible = ready && controlsVisible && !compact && !motion.transitioning,
+                    visible = ready && controlsVisible && !compact &&
+                        !motion.transitioning && !travellingChromeHidden,
                     enter = fadeIn(),
                     exit = fadeOut(),
                 ) {

@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Fullscreen
@@ -133,6 +134,8 @@ internal data class PipePlayerChromeCallbacks(
     val onFullscreen: () -> Unit,
     /** Leave the corner window or PiP and go back to the host's rect. */
     val onExpand: () -> Unit,
+    /** Dismiss the corner mini player: stop playback, tear the surface down. */
+    val onClose: () -> Unit,
     val onQuality: () -> Unit,
     val onSpeed: () -> Unit,
     val onExtraButton: (String) -> Unit,
@@ -828,9 +831,12 @@ private fun formatTime(millis: Long): String =
  * doing something else — and giving them different chrome would make the same
  * video look like two different features depending on how it got small.
  *
- * Three controls, and no more: play/pause, expand, and a progress line. Anything
- * else is unhittable at this size, and a control the user cannot land on is
- * worse than one that is not there.
+ * Four controls, and no more: play/pause, expand, close, and a progress line.
+ * Anything else is unhittable at this size, and a control the user cannot land
+ * on is worse than one that is not there. Close earns its slot because it is the
+ * only way OUT: a floating window whose sole exits are "pause" and "go back to
+ * the video" is a window the user cannot dismiss, and system PiP ships a close
+ * for exactly this reason.
  *
  * The scrubber here is **not** interactive. A 190dp-wide bar cannot be scrubbed
  * with any accuracy, and an accidental seek is far more annoying than having to
@@ -886,6 +892,18 @@ internal fun PipePlayerCompactChrome(
                 label = "Expand player",
                 onClick = callbacks.onExpand,
                 modifier = Modifier.align(Alignment.BottomEnd),
+            )
+
+            /*
+             * Top-right, where every floating window keeps its close — away
+             * from the two bottom controls so a thumb aiming at expand cannot
+             * land on the one button that is irreversible.
+             */
+            CompactButton(
+                icon = Icons.Filled.Close,
+                label = "Close player",
+                onClick = callbacks.onClose,
+                modifier = Modifier.align(Alignment.TopEnd),
             )
         }
 
