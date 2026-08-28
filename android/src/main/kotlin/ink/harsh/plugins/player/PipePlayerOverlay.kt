@@ -1041,6 +1041,21 @@ class PipePlayerOverlay(private val activity: Activity) {
      * landscape hands control to the OS and drops the fake rotation, portrait
      * takes it back.
      */
+    /**
+     * Android's global auto-rotate switch (quick settings). Read live rather
+     * than cached: the user can flip it while a video is playing, and the very
+     * next reading must obey the new answer. A failed read reports "on", which
+     * is the pre-existing behaviour.
+     */
+    private fun systemAutoRotateEnabled(): Boolean =
+        runCatching {
+            android.provider.Settings.System.getInt(
+                activity.contentResolver,
+                android.provider.Settings.System.ACCELEROMETER_ROTATION,
+                1
+            ) == 1
+        }.getOrDefault(true)
+
     private val orientationListener by lazy {
         object : OrientationEventListener(activity) {
             /*
@@ -1081,6 +1096,20 @@ class PipePlayerOverlay(private val activity: Activity) {
 
             override fun onOrientationChanged(degrees: Int) {
                 if (degrees == ORIENTATION_UNKNOWN || !attached) return
+
+                /*
+                 * The system rotation lock governs the SENSOR path.
+                 *
+                 * Quick settings' "auto-rotate off" is the user saying the
+                 * screen must not follow the phone — and a video player is not
+                 * exempt: the host app locked itself to portrait and this
+                 * listener then rotated the whole Activity anyway, so the app
+                 * turned sideways on a device with rotation locked. The
+                 * fullscreen BUTTON and setFullscreen() are unaffected: those
+                 * are explicit requests, and locking rotation does not mean
+                 * refusing them.
+                 */
+                if (!systemAutoRotateEnabled()) return
 
                 /*
                  * Name the exact landscape, never SCREEN_ORIENTATION_SENSOR_LANDSCAPE.

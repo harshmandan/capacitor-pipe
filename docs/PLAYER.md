@@ -356,6 +356,14 @@ its `pipEnabled` latch on detach. Without both, releasing the player left
 auto-enter armed and swiping home put the host's whole app — a web page, no
 video — into a PiP window. Unverified on a physical device.
 
+**The system rotation lock governs the sensor path.** Quick settings'
+auto-rotate switch is read live on every reading (`ACCELEROMETER_ROTATION`);
+with rotation locked, the listener returns without touching
+`requestedOrientation` — a host locked to portrait stays portrait, which is
+what the user asked for. The fullscreen **button** and `setFullscreen()` are
+deliberately exempt: those are explicit requests, and locking rotation is not
+a refusal of them. Unverified on a physical device.
+
 In PiP the system shrinks the *whole* window, WebView included, so the player
 claims the entire window and shows its compact chrome — the same chrome the
 corner mini player uses, because they are the same idea. In the corner that is
