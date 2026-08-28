@@ -4,8 +4,12 @@ import android.graphics.RectF
 import android.util.Log
 import android.view.TextureView
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VectorConverter
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -20,6 +24,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -45,11 +50,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.util.lerp
@@ -107,6 +115,17 @@ internal fun PipePlayerSurface(
      */
     position: State<Long>,
     buffered: State<Long>,
+    /**
+     * The current media has reported STATE_READY at least once.
+     *
+     * Until it does, the surface is a black box with a centred spinner and NO
+     * chrome — the loading presentation. Showing the full controls over an
+     * empty surface, which is what happened before this flag existed, reads
+     * as the player being broken rather than the video arriving.
+     */
+    mediaReady: State<Boolean>,
+    /** ExoPlayer is buffering: initial prepare, a seek, or a mid-play stall. */
+    buffering: State<Boolean>,
     chromeCallbacks: PipePlayerChromeCallbacks,
     bindSurface: (TextureView) -> Unit,
     onImmersiveChanged: (Boolean) -> Unit,
@@ -844,6 +863,26 @@ internal fun PipePlayerSurface(
             var controlsVisible by remember { mutableStateOf(true) }
 
             /*
+             * The loading presentation's gate, read once per recomposition.
+             *
+             * `controlsVisible` stays whatever it is — the chrome's visibility
+             * is simply ANDed with readiness below, so a video that becomes
+             * ready arrives with the chrome up (the initial true, or the
+             * arrival effect) exactly as before.
+             */
+            val ready = mediaReady.value
+
+            /*
+             * A fresh load starts its chrome timer over.
+             *
+             * Readiness flipping true is an arrival: show the controls and let
+             * the ordinary auto-hide take them down. Without this, a video
+             * whose chrome had auto-hidden before a reload (a seek is a
+             * reload) came back ready with no controls at all.
+             */
+            LaunchedEffect(ready) { if (ready) controlsVisible = true }
+
+            /*
              * Arrive with the chrome UP, then let it auto-hide.
              *
              * This briefly did the opposite, to stop controls flashing during a
@@ -1030,8 +1069,28 @@ internal fun PipePlayerSurface(
                  */
                 val compact = m > 0.5f || pip
 
+                /*
+                 * The spinner, over the video and under the chrome.
+                 *
+                 * Two reasons to spin: the media has never been ready (the
+                 * loading presentation — no chrome is up, so this is the only
+                 * thing on the black box), or a ready video is rebuffering (a
+                 * seek, a stall), where it spins over the frame with the
+                 * chrome still available on tap.
+                 */
+                if (!ready || buffering.value) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        PipePlayerSpinner(
+                            // Sized to its window: full-size boxes get the
+                            // 40dp YouTube-ish wheel, the corner and PiP a
+                            // smaller one that does not dominate the tile.
+                            diameter = if (compact) 24.dp else 40.dp,
+                        )
+                    }
+                }
+
                 AnimatedVisibility(
-                    visible = compact && (pip || controlsVisible),
+                    visible = ready && compact && (pip || controlsVisible),
                     enter = fadeIn(),
                     exit = fadeOut(),
                 ) {
@@ -1054,7 +1113,7 @@ internal fun PipePlayerSurface(
                      * Hidden instantly rather than faded, because a fade is
                      * itself visible at this length.
                      */
-                    visible = controlsVisible && !compact && !motion.transitioning,
+                    visible = ready && controlsVisible && !compact && !motion.transitioning,
                     enter = fadeIn(),
                     exit = fadeOut(),
                 ) {
@@ -1118,6 +1177,42 @@ internal data class PipePlayerGeometry(
     val screenW: Float = 0f,
     val screenH: Float = 0f,
 )
+
+/**
+ * The indeterminate loading wheel — a three-quarter white arc, rotating.
+ *
+ * Hand-drawn rather than material's CircularProgressIndicator, for the same
+ * reason as the rest of the chrome: material3 is on the classpath for
+ * ModalBottomSheet ONLY, and the chrome's look does not come from a theme.
+ * White with no accent, because it sits on the pre-video black where any
+ * colour reads as branding rather than as progress.
+ *
+ * The rotation is a graphicsLayer property, so each frame updates the render
+ * node and recomposes nothing — the same discipline as the drag transform.
+ */
+@Composable
+private fun PipePlayerSpinner(diameter: Dp) {
+    val transition = rememberInfiniteTransition(label = "playerSpinner")
+    val angle by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 900, easing = LinearEasing)),
+        label = "playerSpinnerAngle",
+    )
+    Canvas(
+        Modifier
+            .size(diameter)
+            .graphicsLayer { rotationZ = angle },
+    ) {
+        drawArc(
+            color = Color.White,
+            startAngle = 0f,
+            sweepAngle = 270f,
+            useCenter = false,
+            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
+        )
+    }
+}
 
 /**
  * One chained double-tap burst.

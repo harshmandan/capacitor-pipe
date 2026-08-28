@@ -297,7 +297,11 @@ export interface PipePlayerPlugin {
    * Release the claimed rect.
    *
    * Claiming no rect is the signal to fall back to a floating mini-player, so
-   * this is how a host says "I am navigating away but keep playing".
+   * this is how a host says "I am navigating away but keep playing" — and the
+   * player takes that signal literally: undocking with media loaded enters
+   * mini mode itself (corner window, compact chrome, corner drag), so the
+   * host does not need a `setMini(true)` alongside. `setMini(false)` — or the
+   * expand button — brings it back once a rect is claimed again.
    */
   undock(): Promise<void>;
 

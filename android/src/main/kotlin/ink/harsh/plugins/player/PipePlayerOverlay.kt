@@ -217,6 +217,31 @@ class PipePlayerOverlay(private val activity: Activity) {
     private val ended = mutableStateOf(false)
 
     /**
+     * Media has reached STATE_READY at least once since the last load.
+     *
+     * This is the loading presentation's gate. Between the overlay attaching
+     * (a `dock()` lands before `load()` does, and extraction can hold that gap
+     * open for seconds) and the first frame being decodable, the surface used
+     * to present the full controls chrome, centred over an empty black box —
+     * which read as the player being broken rather than the video loading.
+     * Until this latches, the surface shows a black box with a centred
+     * indeterminate spinner and no chrome at all.
+     *
+     * Latched rather than mirrored from the playback state: a mid-play
+     * rebuffer must not strip the controls away — [buffering] carries that,
+     * and only re-shows the spinner.
+     */
+    private val mediaReady = mutableStateOf(false)
+
+    /**
+     * ExoPlayer is buffering: the initial prepare, a seek, or a stall.
+     *
+     * Drives the spinner while [mediaReady] drives the chrome, so a rebuffer
+     * spins over a video that keeps its controls.
+     */
+    private val buffering = mutableStateOf(false)
+
+    /**
      * The only thing a consumer may restyle.
      *
      * Everything else about the chrome is fixed on purpose — see
@@ -319,6 +344,10 @@ class PipePlayerOverlay(private val activity: Activity) {
                 durationMs.value = if (reported == C.TIME_UNSET) 0L else reported
                 live.value = exo.isCurrentMediaItemLive
                 ended.value = state == Player.STATE_ENDED
+                buffering.value = state == Player.STATE_BUFFERING
+                // Latched, not mirrored: READY means the loading presentation
+                // is over for this media; only the next load() takes it back.
+                if (state == Player.STATE_READY) mediaReady.value = true
                 // The PiP strip is a static snapshot: without this it keeps a
                 // play glyph on a finished video.
                 pip?.setPlaybackState(playing.value, ended.value)
@@ -355,6 +384,17 @@ class PipePlayerOverlay(private val activity: Activity) {
         }
         exo.addListener(listener)
         playerListener = listener
+
+        /*
+         * Seeded from the live player, not blindly reset. Attach normally runs
+         * before load() — nothing ready, show the loading presentation — but a
+         * dock() can also re-attach around a player that is already mid-video,
+         * and starting that one back at "loading" would strip its chrome and
+         * spin over a playing frame.
+         */
+        mediaReady.value = exo.playbackState == Player.STATE_READY ||
+            exo.playbackState == Player.STATE_ENDED
+        buffering.value = exo.playbackState == Player.STATE_BUFFERING
 
         /*
          * Position has no callback; it has to be sampled. 250ms is fine for a
@@ -469,6 +509,8 @@ class PipePlayerOverlay(private val activity: Activity) {
                 // scrubber's draw and the timestamp, not this whole tree.
                 position = positionMs,
                 buffered = bufferedMs,
+                mediaReady = mediaReady,
+                buffering = buffering,
                 chromeCallbacks = callbacks,
                 bindSurface = { texture ->
                     exo.setVideoTextureView(texture)
@@ -574,7 +616,13 @@ class PipePlayerOverlay(private val activity: Activity) {
         suppressAutoFullscreen = false
         holdLandscape = false
         // The motion object outlives the view tree; without this a later dock
-        // resurrected a player that still believed it was fullscreen.
+        // resurrected a player that still believed it was fullscreen. The mode
+        // flags outlive it the same way — detach resets the miniProgress axis,
+        // so a stale `mini` would disagree with it on the next attach — and a
+        // stale `mediaReady` would skip the loading presentation entirely.
+        mini.value = false
+        mediaReady.value = false
+        buffering.value = false
         uiScope.launch { motion.reset() }
 
         composeView?.let { view ->
@@ -602,6 +650,33 @@ class PipePlayerOverlay(private val activity: Activity) {
 
     fun undock() {
         dockRect.value = null
+
+        /*
+         * Claiming no rect IS the mini player — make the mode agree.
+         *
+         * The surface already fell back to drawing at the corner rect when no
+         * rect was claimed, but nothing flipped `mini`, so a host that
+         * undocked a full-size player left it in a half state: corner-sized,
+         * yet wearing the full docked chrome, immovable (the corner drag only
+         * arms while mini), and answering the swipe-up fullscreen gesture.
+         * That is exactly the "mini-sized player with a full overlay" a host
+         * navigation produces when the video was docked at the moment of
+         * leaving — minimise-then-navigate never showed it because the
+         * minimise button had already set the flag.
+         *
+         * Guarded to the case it is for: an attached player with media that is
+         * not already mini and not in PiP (there the system owns the window).
+         * The collapse runs first for the same reason setMini's does — a
+         * fullscreen player travelling diagonally to the corner while
+         * shrinking reads as a glitch. Device-unverified.
+         */
+        if (attached && !mini.value && !inPip.value && (player?.mediaItemCount ?: 0) > 0) {
+            mini.value = true
+            uiScope.launch {
+                motion.animateTo(false)
+                motion.animateMini(true)
+            }
+        }
     }
 
     /**
@@ -1288,6 +1363,12 @@ class PipePlayerOverlay(private val activity: Activity) {
 
     private fun resetForNewMedia() {
         ended.value = false
+        // Back to the loading presentation: black box, spinner, no chrome,
+        // until this media reports READY. `buffering` is set eagerly rather
+        // than waiting for ExoPlayer's callback so there is no chrome-less,
+        // spinner-less gap between the load call and the first state event.
+        mediaReady.value = false
+        buffering.value = true
         videoAspect.value = 0f
         positionMs.value = 0L
         bufferedMs.value = 0L

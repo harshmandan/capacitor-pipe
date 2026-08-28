@@ -64,6 +64,24 @@ edge to play faster through, so the rate would climb, hit the edge and stall.
 Note the current scrubber treats live as "at the live edge" and does not model a
 DVR window — behind-the-edge playback shows a full bar.
 
+## Loading presentation
+
+Until the loaded media first reports `STATE_READY`, the player presents a
+black box with a centred indeterminate spinner and **no controls chrome at
+all**. That window is real and long: a `dock()` normally lands before the
+`load()` does, and the host may spend seconds extracting in between — showing
+the full play/pause/seek chrome centred over an empty surface there read as
+the player being broken rather than the video arriving.
+
+Readiness is **latched per load**, not mirrored from the playback state: a
+mid-play rebuffer (a seek, a stall) shows the spinner over the video but never
+strips the chrome back off. Every `load()` — including the reload that a seek
+or a quality switch is — takes the presentation back to loading, and arrival
+brings the chrome up before the usual auto-hide. A load issued around a
+`release()` (the session epoch — see § The player outlives your pages) can no
+longer flash chrome either: detach resets the latch, so a fresh attach starts
+not-ready. Device-unverified.
+
 ## Following playback
 
 The player draws its own scrubber, so a host never needs the position to render
@@ -227,6 +245,15 @@ native rather than a `<video>` tag.
 
 The consequence: **every page that wants the player must `dock()` on mount and
 `undock()` on unmount.** A rect measured on one page is meaningless on the next.
+
+**`undock()` with media loaded enters mini mode itself.** The mode and the rect
+are one state, owned here: before this, the surface fell back to drawing at
+the corner rect while the `mini` flag stayed wherever the last button press
+left it — undock a full-size player and you got a corner-sized video wearing
+the full docked chrome, immovable (the corner drag only arms in mini) and
+answering the swipe-up fullscreen gesture. Now no-rect-claimed and mini agree
+by construction; a host never needs `setMini(true)` next to its `undock()`.
+Device-unverified.
 
 So when the user minimises on page A, navigates to page B and presses expand,
 there is nothing to expand into. The player stays in the corner and emits
@@ -393,7 +420,11 @@ undock() => any
 Release the claimed rect.
 
 Claiming no rect is the signal to fall back to a floating mini-player, so
-this is how a host says "I am navigating away but keep playing".
+this is how a host says "I am navigating away but keep playing" — and the
+player takes that signal literally: undocking with media loaded enters
+mini mode itself (corner window, compact chrome, corner drag), so the
+host does not need a `setMini(true)` alongside. `setMini(false)` — or the
+expand button — brings it back once a rect is claimed again.
 
 **Returns:** <code>any</code>
 
