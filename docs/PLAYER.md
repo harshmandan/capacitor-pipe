@@ -270,6 +270,15 @@ That is not a tidy-up. The hand-rolled version entered PiP and then showed the
 host's web page, because the mode-change callback it waited on does not arrive on
 Android 17 — which changed the Activity-recreation defaults.
 
+**Auto-enter is armed only while the player is alive.** `setEnabled(true)`
+lands on `Activity.setPictureInPictureParams`, which is sticky for the
+Activity's lifetime, and core-pip's own `close()` releases only its bounds
+tracker — it never clears the params (verified against alpha02's bytecode). So
+`PipePlayerPip.close()` calls `setEnabled(false)` first, and the overlay drops
+its `pipEnabled` latch on detach. Without both, releasing the player left
+auto-enter armed and swiping home put the host's whole app — a web page, no
+video — into a PiP window. Unverified on a physical device.
+
 In PiP the system shrinks the *whole* window, WebView included, so the player
 claims the entire window and shows its compact controls: play/pause bottom-left,
 expand bottom-right, and a progress line flush to the bottom edge — the same

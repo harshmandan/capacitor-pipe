@@ -221,6 +221,16 @@ internal class PipePlayerPip(
     }
 
     override fun close() {
+        /*
+         * Disarm auto-enter BEFORE closing. `setEnabled(true)` pushed params to
+         * `Activity.setPictureInPictureParams`, which is sticky for the
+         * Activity's lifetime — and the library's own `close()` only releases
+         * its bounds tracker, never the params (verified against alpha02's
+         * bytecode). Without this line, releasing the player left auto-enter
+         * armed on the Activity, and swiping home turned the whole app — a web
+         * page, no video anywhere — into a PiP window.
+         */
+        runCatching { impl.setEnabled(false) }
         runCatching { activity.unregisterReceiver(receiver) }
         impl.removeOnPictureInPictureEventListener(this)
         impl.close()

@@ -547,6 +547,13 @@ class PipePlayerOverlay(private val activity: Activity) {
         sheetView = null
         pip?.close()
         pip = null
+        /*
+         * PiP auto-enter is armed only while a video surface is live. The
+         * delegate's close() above disarms the Activity's sticky params; this
+         * clears our own latch so a detached player cannot answer `enterPip`,
+         * and the next session starts unarmed until its host opts in again.
+         */
+        pipEnabled = false
         (activity.findViewById<ViewGroup>(android.R.id.content))
             ?.viewTreeObserver
             ?.removeOnGlobalLayoutListener(geometryListener)
