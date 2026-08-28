@@ -43,6 +43,30 @@ open class PipePlayerPlugin : Plugin() {
         get() = overlayInstance ?: createOverlay().also { overlayInstance = it }
 
     /**
+     * The session epoch: bumped by [release] (and destroy) the moment the call
+     * reaches the bridge, and captured by [dock] and [load] at the same point.
+     *
+     * Those two are the only methods that ATTACH the overlay, and both do their
+     * work on a posted main-thread runnable — so there is a window between a
+     * call arriving and its runnable running in which a `release()` can land.
+     * Without the epoch, a load that was already in flight when the release
+     * executed would re-attach the overlay it had just torn down: a surface
+     * painted over the host's page with no owner left to take it down, PiP
+     * re-armable behind it, and a prepared ExoPlayer nothing would release.
+     *
+     * The runnable therefore re-checks the epoch it captured and rejects as
+     * stale instead of touching the overlay. A load issued AFTER the release
+     * captures the new epoch and proceeds — release-then-load is the normal
+     * way to start a fresh video.
+     *
+     * An AtomicInteger rather than an Int because the capture happens on the
+     * bridge's thread and the bump-vs-check on whichever thread gets there
+     * first; the epoch only ever grows, so a lost race between two releases
+     * still invalidates every load older than either.
+     */
+    private val epoch = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /**
      * Drives the motion animations.
      *
      * Must be AndroidUiDispatcher.Main, not MainScope(): Compose's Animatable
@@ -128,6 +152,9 @@ open class PipePlayerPlugin : Plugin() {
     }
 
     override fun handleOnDestroy() {
+        // Invalidate any dock/load still in flight: attaching to an Activity
+        // that is being destroyed helps nobody.
+        epoch.incrementAndGet()
         scope.cancel()
         // Only an overlay that exists needs releasing; `overlay` here would
         // have CREATED one just to tear it down.
@@ -193,7 +220,14 @@ open class PipePlayerPlugin : Plugin() {
         val density = call.getFloat("dpr") ?: activity.resources.displayMetrics.density
         Log.i(TAG, "dock css=($x,$y,${width}x$height) dpr=$density")
 
+        // Captured before the post: a release() that lands between here and the
+        // runnable running must win, because dock attaches — see [epoch].
+        val generation = epoch.get()
         activity.runOnUiThread {
+            if (generation != epoch.get()) {
+                call.reject("the player was released while this dock was pending")
+                return@runOnUiThread
+            }
             // attach() throws on a host with no content view; a crash inside
             // runOnUiThread takes the app down, a rejection tells the caller.
             runCatching {
@@ -390,7 +424,17 @@ open class PipePlayerPlugin : Plugin() {
             return
         }
 
+        // Captured before the post, checked inside it: load is the other method
+        // that attaches, and a load left pending across a release() would
+        // otherwise resurrect the overlay the release just took down, prepare
+        // an ExoPlayer nothing owns, and leave the surface painted over the
+        // host's page with no way back — see [epoch].
+        val generation = epoch.get()
         activity.runOnUiThread {
+            if (generation != epoch.get()) {
+                call.reject("the player was released while this load was pending")
+                return@runOnUiThread
+            }
             runCatching {
                 overlay.attach()
                 when (request) {
@@ -444,11 +488,25 @@ open class PipePlayerPlugin : Plugin() {
         }
     }
 
+    /**
+     * Tear down the player and remove the overlay.
+     *
+     * The epoch bump happens HERE, at bridge entry, not inside the runnable:
+     * a dock or load that is already past its own capture but not yet run must
+     * see the release the moment it was issued, and a fresh load issued after
+     * this call returns to JS is guaranteed to capture the new epoch. The
+     * teardown itself is synchronous once the runnable runs — the overlay
+     * detaches, PiP is disarmed (the overlay's detach clears both the sticky
+     * Activity params and its own latch), and the player is released.
+     */
     @PluginMethod
     fun release(call: PluginCall) {
         if (rejectIfUnavailable(call)) return
+        epoch.incrementAndGet()
         activity.runOnUiThread {
-            overlay.release()
+            // overlayInstance, not the creating getter: releasing a player that
+            // was never built must not build one to tear it down.
+            overlayInstance?.release()
             call.resolve()
         }
     }

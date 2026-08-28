@@ -247,6 +247,21 @@ aspect ratio, duration, position and ended state, cancels an in-flight 2× boost
 and animates the player out of the corner into the host's rect. Playback speed
 survives on purpose — it is a user preference, not a property of the media.
 
+**`release()` beats a pending `dock()`/`load()`.** Those two are the methods
+that attach the overlay, and each does its work on a posted main-thread
+runnable — so a `release()` can land in the gap between the call arriving and
+its runnable running. The plugin keeps a session epoch: `release()` bumps it at
+bridge entry, `dock()` and `load()` capture it at theirs, and a runnable whose
+epoch has moved on rejects as stale (`"the player was released while this load
+was pending"`) instead of touching the overlay. So a close issued while a load
+is in flight tears the surface down at once, the stale load can neither
+re-attach the overlay nor leak a prepared ExoPlayer, and PiP stays disarmed —
+detach clears both the Activity's sticky params and the overlay's own latch. A
+load issued *after* the release captures the new epoch and proceeds:
+release-then-load is the normal way to start a fresh video. What this cannot
+cover is work the plugin never sees — a host that is still extracting has not
+called `load()` yet, and cancelling that is the host's job. Device-unverified.
+
 ## Picture-in-Picture
 
 Opt in with `pip: true`, **and** declare it on your own Activity. A plugin's
