@@ -255,6 +255,27 @@ answering the swipe-up fullscreen gesture. Now no-rect-claimed and mini agree
 by construction; a host never needs `setMini(true)` next to its `undock()`.
 Device-unverified.
 
+**Mini transitions are serialised, and the chrome hides while one runs.**
+`undock()` and `setMini()` animate the same axis, and each used to fire its own
+launch; the launches are FIFO but their suspensions interleave, so an undock's
+collapse-then-travel could land its corner animation *after* a host's
+`setMini(false)` had already finished — parking the video at the corner while
+the mode said docked. One owned job now replaces the previous transition
+wholesale, so the newest intent always wins. And while the box travels between
+the docked rect and the corner, no chrome is drawn at all: mid-travel the box
+is roughly half size, and either set of controls laid out in it read as the
+player broken at half height rather than as a window in motion.
+Device-unverified.
+
+**Adopting a corner video into a new page is `dock()` + `setMini(false)`.**
+The corner player is the same live playback, so a page that owns the video
+does not reload it: claim the rect, then ask the player out of the corner —
+in that order, and the video travels into the rect with playback untouched.
+`dock()` alone deliberately does not leave mini: a rect appearing is a page
+mounting, not a request to expand, and the user may want the video to stay in
+the corner while they read. (`load()` is the other way out of the corner: new
+media claims the rect itself.)
+
 So when the user minimises on page A, navigates to page B and presses expand,
 there is nothing to expand into. The player stays in the corner and emits
 `expandUnavailable` rather than guessing. Route back, the way YouTube does:
@@ -322,9 +343,19 @@ auto-enter armed and swiping home put the host's whole app — a web page, no
 video — into a PiP window. Unverified on a physical device.
 
 In PiP the system shrinks the *whole* window, WebView included, so the player
-claims the entire window and shows its compact controls: play/pause bottom-left,
-expand bottom-right, and a progress line flush to the bottom edge — the same
-chrome the corner mini player uses, because they are the same idea.
+claims the entire window and shows its compact chrome — the same chrome the
+corner mini player uses, because they are the same idea. In the corner that is
+play/pause bottom-left, expand bottom-right, close top-right, and a progress
+line flush to the bottom edge; in PiP only the progress line survives, because
+the system owns input there — our buttons would sit dead under its control
+strip, so play/pause goes into that strip as a RemoteAction instead.
+
+The close button is the corner window's one irreversible control, kept
+top-right where every floating window puts it and away from the two bottom
+buttons. Pressing it emits `closed` and then the player releases **itself** —
+surface down, playback stopped, PiP disarmed — so it works even if no listener
+is registered. The event is the host's cue to end what only it owns: an open
+SABR session, a download pin, whatever record says a video floats.
 
 Known rough edge: the system's own PiP controls appear over ours on tap.
 
@@ -739,7 +770,7 @@ Emitted when a control the host owns is tapped.
 
 | Prop           | Type                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`action`**   | <code>string</code> | One of: - `speed` / `quality` — the button was tapped and a sheet opened - `speedSelected` / `qualitySelected` — a row was chosen; `buttonId` is its id - `minimise` — shrunk to the corner; the player keeps playing - `expand` — left the corner window or PiP - `expandUnavailable` — expand was pressed with no rect claimed on this page. Route back to the page that owns the video; see docs/PLAYER.md. - `previous` / `next` — queue controls, if you enabled them - `button` — your custom control; `buttonId` is its id |
+| **`action`**   | <code>string</code> | One of: - `speed` / `quality` — the button was tapped and a sheet opened - `speedSelected` / `qualitySelected` — a row was chosen; `buttonId` is its id - `minimise` — shrunk to the corner; the player keeps playing - `expand` — left the corner window or PiP - `expandUnavailable` — expand was pressed with no rect claimed on this page. Route back to the page that owns the video; see docs/PLAYER.md. - `closed` — the corner mini player's close button. The player has already released itself when this arrives; the host's job is its OWN state — a SABR session, a download pin, whatever record says a video floats. - `previous` / `next` — queue controls, if you enabled them - `button` — your custom control; `buttonId` is its id |
 | **`buttonId`** | <code>string</code> | The id of the button or the selected row, depending on `action`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 
