@@ -34,7 +34,7 @@ buildscript {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://jitpack.io' }
+        maven { url = 'https://jitpack.io' }
     }
     dependencies {
         // Capacitor 8 baseline. Do NOT raise this to AGP 9 to accommodate
@@ -59,7 +59,7 @@ apply plugin: 'org.jetbrains.kotlin.android'
 apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
 android {
-    namespace "ink.harsh.plugins.pipe"
+    namespace = "ink.harsh.plugins.pipe"
     compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 36
     defaultConfig {
         minSdkVersion project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 24
@@ -76,7 +76,7 @@ android {
         }
     }
     lint {
-        abortOnError false
+        abortOnError = false
     }
     compileOptions {
         // Capacitor 8 compiles capacitor-android at Java 21, so the whole build
@@ -86,13 +86,13 @@ android {
         sourceCompatibility JavaVersion.VERSION_21
         targetCompatibility JavaVersion.VERSION_21
         // The extractors use java.time and other desugarable APIs below API 26.
-        coreLibraryDesugaringEnabled true
+        coreLibraryDesugaringEnabled = true
     }
     kotlinOptions {
         jvmTarget = '21'
     }
     buildFeatures {
-        compose true
+        compose = true
     }
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
@@ -107,7 +107,7 @@ android {
 repositories {
     google()
     mavenCentral()
-    maven { url 'https://jitpack.io' }
+    maven { url = 'https://jitpack.io' }
 }
 
 /*

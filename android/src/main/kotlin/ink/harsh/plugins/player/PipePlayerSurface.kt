@@ -834,7 +834,15 @@ internal fun PipePlayerSurface(
 
             var zoom by remember { mutableStateOf(1f) }
 
-            val transformState = rememberTransformableState { zoomChange, _, _ ->
+            /*
+             * The four-argument overload: centroid, zoom, pan, rotation. The
+             * centroid is ignored on purpose — zoom here is a single scalar fed
+             * to `graphicsLayer`, anchored at the box's centre, with no pan to
+             * offset and nothing to rotate. Anchoring at the pinch point would
+             * mean carrying a translation as well, and a crop that drifts off
+             * centre is not what the fill stop below is for.
+             */
+            val transformState = rememberTransformableState { _, zoomChange, _, _ ->
                 val next = (zoom * zoomChange).coerceIn(1f, max(2f, coverScale))
                 /*
                  * Magnetic at the fill point. Landing exactly on cover by pinch
