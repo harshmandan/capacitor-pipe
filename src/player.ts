@@ -161,6 +161,54 @@ export interface OfflineSource {
   tracks: [OfflineTrack] | [OfflineTrack, OfflineTrack];
 }
 
+/** Which corner the mini player parks in. */
+export type PlayerMiniCorner = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight';
+
+/**
+ * Where the corner player sits, and how big it is.
+ *
+ * Host-supplied, because these are layout decisions the host owns rather than
+ * styling that would fragment the player's look. The margins in particular
+ * cannot be derived: the mini player lives inside the app's window, so what it
+ * has to clear is the host's own bottom nav or app bar, which Android has no
+ * inset for. Only the host knows its tab bar is 56dp tall.
+ *
+ * **Merged onto the live config, not onto the defaults.** An absent key keeps
+ * its current value, so `{ paddingBottom: 96 }` adjusts one side without
+ * silently resetting the width and corner it never mentioned.
+ */
+export interface PlayerMiniConfig {
+  /** Width in dp. Height follows from 16:9. Defaults to 190. */
+  width?: number;
+  /** Defaults to `bottomRight`. */
+  corner?: PlayerMiniCorner;
+  /**
+   * Insets per side, in dp — four numbers, not one vertical and one horizontal.
+   *
+   * The sides are genuinely different: a host typically has a tall bottom nav
+   * and a shorter top bar, so a single vertical margin either floats the player
+   * too high in one corner or lets it collide in the other. Four numbers also
+   * mean moving the player between corners needs no reconfiguration.
+   *
+   * Defaults: 14 left and right, 72 top, 42 bottom. The vertical pair are
+   * larger because a corner sits under the status bar and, in most hosts, an
+   * app bar too; the defaults clear a standard 56dp toolbar and a typical
+   * bottom nav. A host with taller chrome raises them, which is why these are
+   * props and not constants.
+   */
+  paddingLeft?: number;
+  paddingTop?: number;
+  paddingRight?: number;
+  paddingBottom?: number;
+  /**
+   * Whether the user may drag it to another corner. Defaults to true.
+   *
+   * The starting corner is still the host's choice; this decides whether the
+   * user can override it in the moment, as system PiP allows.
+   */
+  draggable?: boolean;
+}
+
 export interface PlayerConfig {
   /** The one colour you control. Accepts `#RGB`, `#RRGGBB`, `#AARRGGBB`. */
   accentColor?: string;
@@ -237,6 +285,14 @@ export interface PlayerConfig {
    * the contract you sign by opting in.
    */
   handleClose?: boolean;
+  /**
+   * Geometry for the corner mini player.
+   *
+   * Merged onto the live config — see {@link PlayerMiniConfig}. Send it once
+   * with the rest of your `configure()`; it applies whenever the player is in
+   * the corner, including a corner it entered before this call.
+   */
+  mini?: PlayerMiniConfig;
   /**
    * One custom control, placed after speed and quality.
    *

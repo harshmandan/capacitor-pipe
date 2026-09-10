@@ -278,6 +278,17 @@ the gesture that means "keep playing while I go elsewhere", and the host reports
 it. The `minimise` action is gone from `playerAction` with it; `setMini(false)`
 and the corner's own expand button are unchanged.
 
+**The corner's size and margins are the host's, through `configure({ mini })`.**
+Width, corner, the four paddings and whether it may be dragged. The margins
+cannot be derived here: the corner window lives inside the host's own window, so
+what it has to clear is the host's bottom nav or app bar, and Android publishes
+no inset for either. The defaults clear a 56dp toolbar and a typical tab bar
+(72dp top, 42dp bottom, 14dp each side); a host with taller chrome raises them.
+The block is merged onto the **live** config, so `{ mini: { paddingBottom: 96 } }`
+moves one edge and leaves the width and corner alone — seeded from the defaults
+instead, it would silently reset both. Android accepted this block already; it
+was missing from the TypeScript `PlayerConfig`, so no typed caller could send it.
+
 **Mini transitions are serialised, and the chrome hides while one runs.**
 `undock()` and `setMini()` animate the same axis, and each used to fire its own
 launch; the launches are FIFO but their suspensions interleave, so an undock's
