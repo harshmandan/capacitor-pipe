@@ -487,12 +487,6 @@ class PipePlayerOverlay(private val activity: Activity) {
             onReplay = ::replay,
             onPrevious = { onChromeEvent?.invoke("previous", null) },
             onNext = { onChromeEvent?.invoke("next", null) },
-            onMinimise = {
-                // Shrink first, then tell the host — it may want to
-                // navigate away, and the player keeps playing regardless.
-                setMini(true)
-                onChromeEvent?.invoke("minimise", null)
-            },
             onFullscreen = { uiScope.launch { motion.animateTo(!motion.isFullscreen) } },
             onExpand = {
                 // One button, two ways of being small. From PiP the
@@ -569,7 +563,6 @@ class PipePlayerOverlay(private val activity: Activity) {
                     durationMs = durationMs.value,
                     fullscreen = motion.isFullscreen,
                     ended = ended.value,
-                    canMinimise = pipSupported,
                     live = live.value,
                     title = title.value,
                     subtitle = subtitle.value,
@@ -756,8 +749,8 @@ class PipePlayerOverlay(private val activity: Activity) {
          * arms while mini), and answering the swipe-up fullscreen gesture.
          * That is exactly the "mini-sized player with a full overlay" a host
          * navigation produces when the video was docked at the moment of
-         * leaving — minimise-then-navigate never showed it because the
-         * minimise button had already set the flag.
+         * leaving — which, since the minimise button was removed, is the only
+         * way into the corner there is.
          *
          * Guarded to the case it is for: an attached player that is not already
          * mini and not in PiP (there the system owns the window). The collapse

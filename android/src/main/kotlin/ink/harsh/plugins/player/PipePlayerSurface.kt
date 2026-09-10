@@ -210,10 +210,10 @@ internal fun PipePlayerSurface(
         var miniCorner by remember(miniConfig.corner) { mutableStateOf(miniConfig.corner) }
 
         /*
-         * Back to the configured corner every time the player is minimised.
+         * Back to the configured corner every time the player arrives there.
          *
-         * A dragged corner used to persist for the life of the app, so
-         * minimising again put the window wherever it was last dropped. System
+         * A dragged corner used to persist for the life of the app, so the
+         * next undock put the window wherever it was last dropped. System
          * PiP does remember, but this is the host's layout rather than the
          * system's: the corner is chosen to avoid the host's own bottom nav or
          * app bar, and a window that quietly stops honouring that is worse than
@@ -252,7 +252,7 @@ internal fun PipePlayerSurface(
         /*
          * No claimed rect means the corner is both ends of the journey.
          *
-         * This used to `return` when un-minimising without a rect, which made
+         * This used to `return` when leaving the corner without a rect, which made
          * the player VANISH: navigate away from the page that docked it, hit
          * expand, and playback continued with nothing on screen. Falling back to
          * the corner keeps the player somewhere real; refusing the expand

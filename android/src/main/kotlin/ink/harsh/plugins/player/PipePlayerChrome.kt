@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.HighQuality
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
@@ -103,14 +102,6 @@ internal data class PipePlayerChromeState(
     val fullscreen: Boolean,
     /** Playback has reached the end, so the centre button offers a restart. */
     val ended: Boolean,
-    /**
-     * Whether shrinking the player is possible at all.
-     *
-     * Tracks PiP availability, which depends on the OS version, the device, the
-     * host's manifest and whether the host shipped core-pip — none of which the
-     * player can arrange for itself.
-     */
-    val canMinimise: Boolean,
     val live: Boolean,
     val title: String?,
     val subtitle: String?,
@@ -130,7 +121,6 @@ internal data class PipePlayerChromeCallbacks(
     val onReplay: () -> Unit,
     val onPrevious: () -> Unit,
     val onNext: () -> Unit,
-    val onMinimise: () -> Unit,
     val onFullscreen: () -> Unit,
     /** Leave the corner window or PiP and go back to the host's rect. */
     val onExpand: () -> Unit,
@@ -238,15 +228,6 @@ private fun TopRow(
             .padding(horizontal = metrics.edge, vertical = metrics.edge),
     ) {
         /*
-         * Minimise: docked only, and only where shrinking leads somewhere.
-         * Positioned absolutely so its absence never moves the title.
-         *
-         * Hidden when PiP is unavailable. A control that visibly does nothing
-         * is worse than an absent one — and the host cannot reason about it
-         * either, since PiP needs a manifest entry and a dependency that a
-         * plugin cannot supply on the host's behalf.
-         */
-        /*
          * Shown or not shown — no slide.
          *
          * The animation existed to soften a change that happened in view. It no
@@ -255,17 +236,6 @@ private fun TopRow(
          * still mid-slide when the curtain lifts. Cheaper and steadier to have
          * the chrome simply be correct for the state it is in.
          */
-        if (!state.fullscreen && state.canMinimise) {
-            Box(Modifier.align(Alignment.TopStart)) {
-                ChromeButton(
-                    Icons.Filled.KeyboardArrowDown,
-                    callbacks.onMinimise,
-                    metrics,
-                    label = "Minimise player",
-                )
-            }
-        }
-
         // Fullscreen only, and without a transition — see the note above.
         if (state.fullscreen && (state.title != null || state.subtitle != null)) {
             Box(

@@ -165,8 +165,8 @@ await PipePlayer.undock();
 // and on resize/orientation change, dock() again with fresh numbers
 ```
 
-Skip it and the failure is quiet rather than loud: minimise on page A, navigate
-to page B, press expand, and there is no rect to expand into. The player stays in
+Skip it and the failure is quiet rather than loud: leave page A with the video
+playing, navigate to page B, press expand, and there is no rect to expand into. The player stays in
 the corner and emits `expandUnavailable` — listen for it and route back to the
 page that owns the video, the way YouTube does.
 

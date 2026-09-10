@@ -89,7 +89,7 @@ open class PipePlayerPlugin : Plugin() {
              */
             created.hostView = bridge?.webView
 
-            // Chrome taps the host cares about — quality, speed, minimise, and
+            // Chrome taps the host cares about — quality, speed, expand, and
             // any consumer button — surface as one event rather than a listener
             // per control.
             created.onChromeEvent = { action, buttonId ->

@@ -81,7 +81,8 @@ PipePlayer.addListener('playerAction', (event) => {
 
   /*
    * The YouTube pattern. Expand was pressed on a page that never claimed a
-   * rect — typically because the user minimised here and then navigated away —
+   * rect — typically because the user navigated away from the page that owned
+   * the video —
    * so the player stayed in the corner and told us. A real app routes back to
    * the watch page; when that page mounts and calls dock(), the player is
    * already there and still playing.

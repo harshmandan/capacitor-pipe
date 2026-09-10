@@ -253,7 +253,6 @@ export interface PlayerActionEvent {
    *
    * - `speed` / `quality` — the button was tapped and a sheet opened
    * - `speedSelected` / `qualitySelected` — a row was chosen; `buttonId` is its id
-   * - `minimise` — shrunk to the corner; the player keeps playing
    * - `expand` — left the corner window or PiP
    * - `expandUnavailable` — expand was pressed with no rect claimed on this
    *   page. Route back to the page that owns the video; see docs/PLAYER.md.
@@ -402,9 +401,8 @@ export interface PipePlayerPlugin {
   /**
    * Controls the host owns rather than the player.
    *
-   * Quality, speed and minimise are surfaced rather than implemented, because
-   * the player has no opinion about your quality list, your speed menu, or what
-   * minimising means in your layout.
+   * Quality and speed are surfaced rather than implemented, because the
+   * player has no opinion about your quality list or your speed menu.
    */
   addListener(
     eventName: 'playerAction',
