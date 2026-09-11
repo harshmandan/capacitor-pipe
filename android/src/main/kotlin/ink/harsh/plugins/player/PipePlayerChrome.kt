@@ -30,19 +30,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.FullscreenExit
-import androidx.compose.material.icons.filled.HighQuality
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Replay
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -277,7 +264,7 @@ private fun TopRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ValueButton(
-                Icons.Filled.Speed,
+                PlayerIcons.Speed,
                 state.speedLabel,
                 "Playback speed",
                 callbacks.onSpeed,
@@ -285,7 +272,7 @@ private fun TopRow(
             )
             Spacer(Modifier.width(6.dp))
             ValueButton(
-                Icons.Filled.HighQuality,
+                PlayerIcons.HighQuality,
                 state.qualityLabel,
                 "Quality",
                 callbacks.onQuality,
@@ -318,7 +305,7 @@ private fun CentreRow(
     ) {
         if (state.showPreviousNext) {
             ChromeButton(
-                Icons.Filled.SkipPrevious,
+                PlayerIcons.SkipPrevious,
                 callbacks.onPrevious,
                 metrics,
                 label = "Previous",
@@ -334,9 +321,9 @@ private fun CentreRow(
          */
         ChromeButton(
             when {
-                state.ended -> Icons.Filled.Replay
-                state.playing -> Icons.Filled.Pause
-                else -> Icons.Filled.PlayArrow
+                state.ended -> PlayerIcons.Replay
+                state.playing -> PlayerIcons.Pause
+                else -> PlayerIcons.PlayArrow
             },
             if (state.ended) callbacks.onReplay else callbacks.onPlayPause,
             metrics,
@@ -350,7 +337,7 @@ private fun CentreRow(
         )
         if (state.showPreviousNext) {
             ChromeButton(
-                Icons.Filled.SkipNext,
+                PlayerIcons.SkipNext,
                 callbacks.onNext,
                 metrics,
                 label = "Next",
@@ -413,7 +400,7 @@ private fun BottomBar(
             }
             Spacer(Modifier.weight(1f))
             ChromeButton(
-                if (state.fullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen,
+                if (state.fullscreen) PlayerIcons.FullscreenExit else PlayerIcons.Fullscreen,
                 callbacks.onFullscreen,
                 metrics,
                 label = if (state.fullscreen) "Exit fullscreen" else "Fullscreen",
@@ -572,7 +559,7 @@ internal fun SpeedBoostPill() {
             ),
         )
         Spacer(Modifier.width(6.dp))
-        Glyph(Icons.Filled.FastForward, 16.dp)
+        Glyph(PlayerIcons.FastForward, 16.dp)
     }
 }
 
@@ -585,7 +572,7 @@ internal fun SpeedBoostPill() {
 @Composable
 internal fun SeekBurstIndicator(seconds: Int, forward: Boolean) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Glyph(if (forward) Icons.Filled.FastForward else Icons.Filled.FastRewind, 30.dp)
+        Glyph(if (forward) PlayerIcons.FastForward else PlayerIcons.FastRewind, 30.dp)
         Spacer(Modifier.height(4.dp))
         BasicText(
             text = "$seconds seconds",
@@ -865,9 +852,9 @@ internal fun PipePlayerCompactChrome(
         if (showButtons) {
             CompactButton(
                 icon = when {
-                    state.ended -> Icons.Filled.Replay
-                    state.playing -> Icons.Filled.Pause
-                    else -> Icons.Filled.PlayArrow
+                    state.ended -> PlayerIcons.Replay
+                    state.playing -> PlayerIcons.Pause
+                    else -> PlayerIcons.PlayArrow
                 },
                 label = when {
                     state.ended -> "Replay"
@@ -879,7 +866,7 @@ internal fun PipePlayerCompactChrome(
             )
 
             CompactButton(
-                icon = Icons.Filled.Fullscreen,
+                icon = PlayerIcons.Fullscreen,
                 label = "Expand player",
                 onClick = callbacks.onExpand,
                 modifier = Modifier.align(Alignment.BottomEnd),
@@ -891,7 +878,7 @@ internal fun PipePlayerCompactChrome(
              * land on the one button that is irreversible.
              */
             CompactButton(
-                icon = Icons.Filled.Close,
+                icon = PlayerIcons.Close,
                 label = "Close player",
                 onClick = callbacks.onClose,
                 modifier = Modifier.align(Alignment.TopEnd),

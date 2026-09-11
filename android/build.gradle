@@ -269,10 +269,11 @@ dependencies {
     compileOnly platform("androidx.compose:compose-bom:$composeBomVersion")
     compileOnly 'androidx.compose.ui:ui'
     compileOnly 'androidx.compose.foundation:foundation'
-    // Material icons only — NOT material/material3. The player draws its own
-    // chrome; all we want is the standard glyph set so the controls look like
-    // Android rather than like hand-rolled paths.
-    compileOnly 'androidx.compose.material:material-icons-extended'
+    // **No material-icons artefact.** The player draws its own chrome and wanted
+    // only the standard glyph set; that came as `material-icons-extended`, 34 MB
+    // of ~2,100 icon classes for the thirteen glyphs used. R8 models all of them
+    // to discard all but thirteen, once per flavour. The thirteen are extracted
+    // verbatim into `PlayerIcons.kt` instead — same shapes, none of the weight.
     // material3 for ModalBottomSheet only. The player draws its own chrome, but
     // a sheet needs real drag-to-dismiss, scrim and predictive-back behaviour —
     // reimplementing that badly is worse than taking the dependency.
@@ -283,7 +284,6 @@ dependencies {
     androidTestImplementation platform("androidx.compose:compose-bom:$composeBomVersion")
     androidTestImplementation 'androidx.compose.ui:ui'
     androidTestImplementation 'androidx.compose.foundation:foundation'
-    androidTestImplementation 'androidx.compose.material:material-icons-extended'
     androidTestImplementation 'androidx.compose.material3:material3'
     androidTestImplementation 'androidx.activity:activity-compose:1.12.4'
     androidTestImplementation 'androidx.dynamicanimation:dynamicanimation:1.1.0'

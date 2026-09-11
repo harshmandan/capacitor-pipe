@@ -14,8 +14,6 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
@@ -141,7 +139,7 @@ internal fun PipePlayerSheet(
                             // The tick is the one place a sheet picks up the
                             // consumer's accent.
                             Icon(
-                                imageVector = Icons.Filled.Check,
+                                imageVector = PlayerIcons.Check,
                                 contentDescription = null,
                                 tint = accent,
                             )
