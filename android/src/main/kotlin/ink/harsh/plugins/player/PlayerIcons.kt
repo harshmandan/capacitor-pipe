@@ -19,11 +19,15 @@ import androidx.compose.ui.unit.dp
  * the first place.
  *
  * **Why they are here instead.** That artefact is 34 MB of about 2,100 icon
- * classes, and R8 models every one of them to throw away all but these
- * thirteen. R8 is a whole-program optimiser, so it pays that cost once per
- * flavour — 246 times a release, at roughly 95 seconds each. Eleven of the
- * thirteen are not in the 808 KB core set, so trimming to core was not an
- * option; carrying the paths is.
+ * classes for these thirteen, and eleven of them are not in the 808 KB core set,
+ * so trimming to core was never an option. What is bought is a smaller APK and
+ * one fewer dependency.
+ *
+ * **Not build time, which is what it was tried for.** R8 went from 150.2s to
+ * 145.4s, about 3%. Measured afterwards: unreachable classes die in R8's
+ * Enqueuer, which is 16% of its work, and never reach IR conversion, which is
+ * 54%. Deleting dead code barely moves R8 — see `docs/MOBILE.md` in the app
+ * repo, "Where R8's two minutes actually go".
  *
  * The parameters mirror `materialIcon`/`materialPath` exactly: a 24 dp icon on
  * a 24-unit viewport, filled solid black with no stroke, `Butt` cap and `Bevel`

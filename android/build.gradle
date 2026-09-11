@@ -271,9 +271,10 @@ dependencies {
     compileOnly 'androidx.compose.foundation:foundation'
     // **No material-icons artefact.** The player draws its own chrome and wanted
     // only the standard glyph set; that came as `material-icons-extended`, 34 MB
-    // of ~2,100 icon classes for the thirteen glyphs used. R8 models all of them
-    // to discard all but thirteen, once per flavour. The thirteen are extracted
-    // verbatim into `PlayerIcons.kt` instead — same shapes, none of the weight.
+    // of ~2,100 icon classes for the thirteen glyphs used. The thirteen are
+    // extracted verbatim into `PlayerIcons.kt` instead — same shapes, none of
+    // the weight. It buys a smaller APK, not build time: R8 moved 3%, because
+    // unreachable classes die in its Enqueuer and never reach IR conversion.
     // material3 for ModalBottomSheet only. The player draws its own chrome, but
     // a sheet needs real drag-to-dismiss, scrim and predictive-back behaviour —
     // reimplementing that badly is worse than taking the dependency.
