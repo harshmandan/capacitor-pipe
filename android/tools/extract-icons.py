@@ -38,6 +38,10 @@ def calls_for(name):
         if re.search(r"\biconst_(\d)\b", line):
             stack.append(bool(int(re.search(r"iconst_(\d)", line).group(1)))); continue
         m = re.search(r"PathBuilder\.(\w+):\(([^)]*)\)", line)
+        # `getNodes()` is the builder reading its path back, not a drawing call;
+        # emitting it leaves an unresolved reference in the Kotlin.
+        if m and m.group(1) == "getNodes":
+            continue
         if m:
             n = len(m.group(2))
             calls.append((m.group(1), stack[-n:] if n else []))

@@ -62,7 +62,6 @@ object PlayerIcons {
             lineTo(21f, 7f)
             lineToRelative(-1.41f, -1.41f)
             close()
-            getNodes()
             }
         }.build()
     }
@@ -97,7 +96,6 @@ object PlayerIcons {
             lineTo(19f, 17.59f)
             lineTo(13.41f, 12f)
             close()
-            getNodes()
             }
         }.build()
     }
@@ -129,7 +127,6 @@ object PlayerIcons {
             lineToRelative(8.5f, -6f)
             lineTo(13f, 6f)
             close()
-            getNodes()
             }
         }.build()
     }
@@ -161,7 +158,6 @@ object PlayerIcons {
             lineTo(20f, 6f)
             lineToRelative(-8.5f, 6f)
             close()
-            getNodes()
             }
         }.build()
     }
@@ -215,7 +211,6 @@ object PlayerIcons {
             lineTo(19f, 5f)
             horizontalLineToRelative(-5f)
             close()
-            getNodes()
             }
         }.build()
     }
@@ -269,7 +264,6 @@ object PlayerIcons {
             lineTo(19f, 8f)
             horizontalLineToRelative(-3f)
             close()
-            getNodes()
             }
         }.build()
     }
@@ -335,7 +329,6 @@ object PlayerIcons {
             horizontalLineToRelative(-2f)
             verticalLineToRelative(3f)
             close()
-            getNodes()
             }
         }.build()
     }
@@ -369,7 +362,6 @@ object PlayerIcons {
             lineTo(18f, 5f)
             horizontalLineToRelative(-4f)
             close()
-            getNodes()
             }
         }.build()
     }
@@ -395,7 +387,6 @@ object PlayerIcons {
             verticalLineToRelative(14f)
             lineToRelative(11f, -7f)
             close()
-            getNodes()
             }
         }.build()
     }
@@ -430,7 +421,6 @@ object PlayerIcons {
             reflectiveCurveToRelative(8f, -3.58f, 8f, -8f)
             reflectiveCurveToRelative(-3.58f, -8f, -8f, -8f)
             close()
-            getNodes()
             }
         }.build()
     }
@@ -463,7 +453,6 @@ object PlayerIcons {
             verticalLineTo(6f)
             horizontalLineToRelative(-2f)
             close()
-            getNodes()
             }
         }.build()
     }
@@ -494,7 +483,6 @@ object PlayerIcons {
             lineToRelative(8.5f, 6f)
             lineTo(18f, 6f)
             close()
-            getNodes()
             }
         }.build()
     }
@@ -534,7 +522,6 @@ object PlayerIcons {
             lineToRelative(-8.49f, 5.66f)
             arcToRelative(2f, 2f, 0f, false, false, 0f, 2.83f)
             close()
-            getNodes()
             }
         }.build()
     }
