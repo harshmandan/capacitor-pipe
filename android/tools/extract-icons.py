@@ -116,6 +116,6 @@ for n in NAMES:
     }}''')
 
 out = head + "\n".join(body) + "\n}\n"
-dest = "/Users/harsh/Documents/GitHub/tutorgrow/vendor/capacitor-pipe/android/src/main/kotlin/ink/harsh/plugins/player/PlayerIcons.kt"
+dest = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src/main/kotlin/ink/harsh/plugins/player/PlayerIcons.kt")
 open(dest, "w").write(out)
 print("wrote", dest, len(out), "bytes")
