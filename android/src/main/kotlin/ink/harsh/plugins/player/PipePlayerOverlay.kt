@@ -33,6 +33,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MediaSource
 import ink.harsh.plugins.pipe.media3.PipeSabrMedia3
 
 /**
@@ -1552,10 +1553,17 @@ class PipePlayerOverlay(private val activity: Activity) {
      *
      * `playingOffline` stays false — this is as online as media gets.
      */
-    fun loadSabrSession(sessionId: String, startPositionMs: Long = 0L) {
+    fun loadSabrSession(sessionId: String, startPositionMs: Long = 0L) =
         // Built before any state is cleared, exactly as loadOffline does: a
         // session that cannot be found must leave the current video playing.
-        val media = PipeSabrMedia3.mediaSource(sessionId)
+        loadSabrMedia(PipeSabrMedia3.mediaSource(sessionId), startPositionMs)
+
+    /**
+     * Play a SABR source built elsewhere. The plugin builds it on its own thread
+     * — building parses the session's DASH manifest — and hands it over here, so
+     * the main thread only swaps it in.
+     */
+    fun loadSabrMedia(media: MediaSource, startPositionMs: Long = 0L) {
         resetForNewMedia()
         playingOffline = false
         ensurePlayer().apply {
@@ -1564,13 +1572,21 @@ class PipePlayerOverlay(private val activity: Activity) {
         }
     }
 
-    fun loadOffline(source: PipeOfflineSource, startPositionMs: Long = 0L) {
+    fun loadOffline(source: PipeOfflineSource, startPositionMs: Long = 0L) =
         // Built before any state is cleared: a source that cannot be built must
         // leave the currently playing video exactly as it was.
-        val media = PipePlayerOffline.buildMediaSource(activity, source)
+        loadOfflineMedia(PipePlayerOffline.buildMediaSource(activity, source), startPositionMs)
+
+    /**
+     * Play an offline source built elsewhere. Building resolves the decryption
+     * key, which for a `keyRef` calls the host's provider — typically an Android
+     * Keystore unwrap — so the plugin builds it on its own thread and only the
+     * swap happens on main.
+     */
+    fun loadOfflineMedia(media: MediaSource, startPositionMs: Long = 0L) {
         resetForNewMedia()
         playingOffline = true
-        Log.i(TAG, "loadOffline start=$startPositionMs tracks=${source.tracks.size}")
+        Log.i(TAG, "loadOffline start=$startPositionMs")
         ensurePlayer().apply {
             setMediaSource(media, startPositionMs)
             prepare()

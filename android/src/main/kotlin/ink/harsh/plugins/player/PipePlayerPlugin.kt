@@ -8,6 +8,7 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import ink.harsh.plugins.pipe.media3.PipeSabrMedia3
 import androidx.compose.ui.platform.AndroidUiDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
@@ -445,6 +446,23 @@ open class PipePlayerPlugin : Plugin() {
             return
         }
 
+        // Offline and SABR sources are built HERE, on the plugin's thread, and
+        // only swapped in on main: building an offline source resolves its key
+        // (a host provider — a Keystore unwrap in the app this was written for)
+        // and a SABR one parses a DASH manifest. Both ran inside runOnUiThread,
+        // which is main-thread work a slow Keystore turns into an ANR.
+        val media = try {
+            when (request) {
+                is PipeLoadRequest.Url -> null
+                is PipeLoadRequest.Offline ->
+                    PipePlayerOffline.buildMediaSource(activity.applicationContext, request.source)
+                is PipeLoadRequest.Sabr -> PipeSabrMedia3.mediaSource(request.sessionId)
+            }
+        } catch (failed: Exception) {
+            call.reject("could not load: ${failed.message}")
+            return
+        }
+
         // Captured before the post, checked inside it: load is the other method
         // that attaches, and a load left pending across a release() would
         // otherwise resurrect the overlay the release just took down, prepare
@@ -462,9 +480,9 @@ open class PipePlayerPlugin : Plugin() {
                     is PipeLoadRequest.Url ->
                         overlay.load(request.url, request.startPositionMs)
                     is PipeLoadRequest.Offline ->
-                        overlay.loadOffline(request.source, request.startPositionMs)
+                        overlay.loadOfflineMedia(checkNotNull(media), request.startPositionMs)
                     is PipeLoadRequest.Sabr ->
-                        overlay.loadSabrSession(request.sessionId, request.startPositionMs)
+                        overlay.loadSabrMedia(checkNotNull(media), request.startPositionMs)
                 }
             }.onSuccess { call.resolve() }
                 .onFailure { call.reject("could not load: ${it.message}") }
