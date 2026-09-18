@@ -290,6 +290,7 @@ class PipePlayerOverlay(private val activity: Activity) {
     private val speedOptions =
         mutableStateOf(listOf("0.5x", "1x", "1.5x", "2x").map { SheetOption(it, it) })
     private val qualityOptions = mutableStateOf(listOf(SheetOption("Auto", "Auto")))
+    private val qualityNote = mutableStateOf<String?>(null)
 
     /**
      * The current media came from local files rather than a URL.
@@ -1618,6 +1619,8 @@ class PipePlayerOverlay(private val activity: Activity) {
         qualityLabel: String?,
         speeds: List<SheetOption>?,
         qualities: List<SheetOption>?,
+        /** Null keeps the current note; an empty string removes it. */
+        qualityNote: String?,
         /**
          * Split into value + provided, unlike every sibling: null means REMOVE
          * for a button — a host must be able to take its extra button down —
@@ -1639,6 +1642,7 @@ class PipePlayerOverlay(private val activity: Activity) {
         speedLabel?.let { this.speedLabel.value = it }
         speeds?.let { this.speedOptions.value = it }
         qualities?.let { this.qualityOptions.value = it }
+        qualityNote?.let { this.qualityNote.value = it.ifEmpty { null } }
         qualityLabel?.let { this.qualityLabel.value = it }
         if (extraButtonProvided) this.extraButton.value = extraButton
     }
@@ -1670,6 +1674,7 @@ class PipePlayerOverlay(private val activity: Activity) {
             },
             onDismiss = { openSheet.value = null },
             immersive = motion.isFullscreen,
+            note = if (speed) null else qualityNote.value,
         )
     }
 

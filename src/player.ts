@@ -87,6 +87,16 @@ export interface PlayerStatus {
 export interface PlayerOption {
   id: string;
   label: string;
+  /**
+   * A glyph after the label. `saved` is a download-done tick, for the row that
+   * plays from a copy on the device.
+   */
+  icon?: 'saved';
+  /**
+   * Drawn dimmed and not tappable — a row that exists but cannot be chosen
+   * right now, such as a stream with no network. Say why in `qualityNote`.
+   */
+  disabled?: boolean;
 }
 
 /**
@@ -241,6 +251,11 @@ export interface PlayerConfig {
    * leaves you to reload at the chosen level.
    */
   qualities?: (PlayerOption | string)[];
+  /**
+   * One line under the quality sheet's title — why some rows are disabled, for
+   * instance. Absent keeps the current note; an empty string removes it.
+   */
+  qualityNote?: string;
   /**
    * Allow Picture-in-Picture. Off unless asked for.
    *

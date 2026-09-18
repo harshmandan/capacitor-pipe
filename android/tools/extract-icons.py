@@ -3,11 +3,13 @@ Recover the player's Material glyphs from the compiled `material-icons-extended`
 artefact and write `PlayerIcons.kt`.
 
 The player wanted the standard glyph set so its controls look like Android; the
-artefact that carried it is 34 MB of ~2,100 icon classes for the thirteen used.
+artefact that carried it is 34 MB of ~2,100 icon classes for the fourteen used.
 This reads the path calls straight out of that artefact's own bytecode, so the
 glyphs are the same shapes rather than redrawn ones.
 
-    unzip the aar's classes.jar into ./work, then:
+    unzip the classes.jar of BOTH material-icons-core-android and
+    material-icons-extended-android (1.7.8) into ./work — `Check` is a core
+    glyph — then:
     python3 extract-icons.py
 
 Run it only to change the glyph set. `PlayerIcons.kt` is generated; editing it
@@ -18,7 +20,7 @@ import re, subprocess, os
 JAVAP = "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home/bin/javap"
 WORK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "work")
 NAMES = ["Check","Close","FastForward","FastRewind","Fullscreen","FullscreenExit",
-         "HighQuality","Pause","PlayArrow","Replay","SkipNext","SkipPrevious","Speed"]
+         "HighQuality","Pause","PlayArrow","Replay","SkipNext","SkipPrevious","Speed","DownloadDone"]
 
 def fmt(v):
     return ("true" if v else "false") if isinstance(v, bool) else f"{v:g}f"
@@ -64,7 +66,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 /**
- * The thirteen Material glyphs the player draws, as vectors of their own.
+ * The fourteen Material glyphs the player draws, as vectors of their own.
  *
  * **Extracted from `material-icons-extended`, not redrawn.** Every path call
  * below was read out of that artefact's own compiled classes, so each glyph is
@@ -73,11 +75,15 @@ import androidx.compose.ui.unit.dp
  * the first place.
  *
  * **Why they are here instead.** That artefact is 34 MB of about 2,100 icon
- * classes, and R8 models every one of them to throw away all but these
- * thirteen. R8 is a whole-program optimiser, so it pays that cost once per
- * flavour — 246 times a release, at roughly 95 seconds each. Eleven of the
- * thirteen are not in the 808 KB core set, so trimming to core was not an
- * option; carrying the paths is.
+ * classes for these fourteen, and twelve of them are not in the 808 KB core set,
+ * so trimming to core was never an option. What is bought is a smaller APK and
+ * one fewer dependency.
+ *
+ * **Not build time, which is what it was tried for.** R8 went from 150.2s to
+ * 145.4s, about 3%. Measured afterwards: unreachable classes die in R8's
+ * Enqueuer, which is 16% of its work, and never reach IR conversion, which is
+ * 54%. Deleting dead code barely moves R8 — see `docs/MOBILE.md` in the app
+ * repo, "Where R8's two minutes actually go".
  *
  * The parameters mirror `materialIcon`/`materialPath` exactly: a 24 dp icon on
  * a 24-unit viewport, filled solid black with no stroke, `Butt` cap and `Bevel`

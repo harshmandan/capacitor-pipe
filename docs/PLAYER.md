@@ -457,7 +457,7 @@ devices.
 ### getPlayerStatus()
 
 ```typescript
-getPlayerStatus() => any
+getPlayerStatus() => Promise<PlayerStatus>
 ```
 
 Whether the player can run in this app.
@@ -467,7 +467,7 @@ error — check this before calling anything else. Every other method rejects
 with an explanation rather than throwing `NoClassDefFoundError`, but asking
 first is better than catching.
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;<a href="#playerstatus">PlayerStatus</a>&gt;</code>
 
 --------------------
 
@@ -475,7 +475,7 @@ first is better than catching.
 ### dock(...)
 
 ```typescript
-dock(options: DockRect) => any
+dock(options: DockRect) => Promise<void>
 ```
 
 Declare where the host has reserved space for video.
@@ -489,15 +489,13 @@ on resize.
 | ------------- | --------------------------------------------- |
 | **`options`** | <code><a href="#dockrect">DockRect</a></code> |
 
-**Returns:** <code>any</code>
-
 --------------------
 
 
 ### undock()
 
 ```typescript
-undock() => any
+undock() => Promise<void>
 ```
 
 Release the claimed rect.
@@ -509,15 +507,13 @@ mini mode itself (corner window, compact chrome, corner drag), so the
 host does not need a `setMini(true)` alongside. `setMini(false)` — or the
 expand button — brings it back once a rect is claimed again.
 
-**Returns:** <code>any</code>
-
 --------------------
 
 
 ### load(...)
 
 ```typescript
-load(options: { url?: string; offline?: OfflineSource; sessionId?: string; startPositionMs?: number; }) => any
+load(options: { url?: string; offline?: OfflineSource; sessionId?: string; startPositionMs?: number; }) => Promise<void>
 ```
 
 Load media and prepare it. Does not start playback.
@@ -530,18 +526,14 @@ to the network would hide a broken download behind a data charge.
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | **`options`** | <code>{ url?: string; offline?: <a href="#offlinesource">OfflineSource</a>; sessionId?: string; startPositionMs?: number; }</code> |
 
-**Returns:** <code>any</code>
-
 --------------------
 
 
 ### play()
 
 ```typescript
-play() => any
+play() => Promise<void>
 ```
-
-**Returns:** <code>any</code>
 
 --------------------
 
@@ -549,7 +541,7 @@ play() => any
 ### getPosition()
 
 ```typescript
-getPosition() => any
+getPosition() => Promise<PlayerPosition>
 ```
 
 Where playback is now, without waiting for the next event.
@@ -559,7 +551,7 @@ to pass as `startPositionMs` when reloading at another quality, or what to
 store as a page unmounts. Resolves zeroes when nothing is loaded — "no
 video" is a state to read, not an error to handle.
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;<a href="#playerposition">PlayerPosition</a>&gt;</code>
 
 --------------------
 
@@ -567,10 +559,8 @@ video" is a state to read, not an error to handle.
 ### pause()
 
 ```typescript
-pause() => any
+pause() => Promise<void>
 ```
-
-**Returns:** <code>any</code>
 
 --------------------
 
@@ -578,12 +568,10 @@ pause() => any
 ### release()
 
 ```typescript
-release() => any
+release() => Promise<void>
 ```
 
 Tear down the player and remove the overlay.
-
-**Returns:** <code>any</code>
 
 --------------------
 
@@ -591,7 +579,7 @@ Tear down the player and remove the overlay.
 ### configure(...)
 
 ```typescript
-configure(options: PlayerConfig) => any
+configure(options: PlayerConfig) => Promise<void>
 ```
 
 Apply the accent colour and the two extension points.
@@ -600,15 +588,13 @@ Apply the accent colour and the two extension points.
 | ------------- | ----------------------------------------------------- |
 | **`options`** | <code><a href="#playerconfig">PlayerConfig</a></code> |
 
-**Returns:** <code>any</code>
-
 --------------------
 
 
 ### setFullscreen(...)
 
 ```typescript
-setFullscreen(options: { fullscreen: boolean; }) => any
+setFullscreen(options: { fullscreen: boolean; }) => Promise<void>
 ```
 
 Animate to fullscreen or back. The swipe gesture is the primary route in.
@@ -617,15 +603,13 @@ Animate to fullscreen or back. The swipe gesture is the primary route in.
 | ------------- | ------------------------------------- |
 | **`options`** | <code>{ fullscreen: boolean; }</code> |
 
-**Returns:** <code>any</code>
-
 --------------------
 
 
 ### setMini(...)
 
 ```typescript
-setMini(options: { mini: boolean; }) => any
+setMini(options: { mini: boolean; }) => Promise<void>
 ```
 
 Shrink to a corner window, or bring it back.
@@ -638,15 +622,13 @@ host navigates away from the page that owned the rect.
 | ------------- | ------------------------------- |
 | **`options`** | <code>{ mini: boolean; }</code> |
 
-**Returns:** <code>any</code>
-
 --------------------
 
 
 ### enterPip()
 
 ```typescript
-enterPip() => any
+enterPip() => Promise<{ entered: boolean; }>
 ```
 
 Enter Picture-in-Picture immediately.
@@ -656,7 +638,7 @@ Requires `pip: true` and the manifest declaration described on
 missing or the device does not support PiP. On Android 12+ you usually do
 not need this — the system enters PiP on its own.
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;{ entered: boolean; }&gt;</code>
 
 --------------------
 
@@ -664,7 +646,7 @@ not need this — the system enters PiP on its own.
 ### addListener('playerAction', ...)
 
 ```typescript
-addListener(eventName: 'playerAction', listener: (event: PlayerActionEvent) => void) => any
+addListener(eventName: 'playerAction', listener: (event: PlayerActionEvent) => void) => Promise<import('@capacitor/core').PluginListenerHandle>
 ```
 
 Controls the host owns rather than the player.
@@ -677,7 +659,7 @@ player has no opinion about your quality list or your speed menu.
 | **`eventName`** | <code>'playerAction'</code>                                                         |
 | **`listener`**  | <code>(event: <a href="#playeractionevent">PlayerActionEvent</a>) =&gt; void</code> |
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;PluginListenerHandle&gt;</code>
 
 --------------------
 
@@ -685,7 +667,7 @@ player has no opinion about your quality list or your speed menu.
 ### addListener('playerPosition', ...)
 
 ```typescript
-addListener(eventName: 'playerPosition', listener: (event: PlayerPosition) => void) => any
+addListener(eventName: 'playerPosition', listener: (event: PlayerPosition) => void) => Promise<import('@capacitor/core').PluginListenerHandle>
 ```
 
 Follow playback position.
@@ -700,7 +682,7 @@ paused, so it can be written straight to a record.
 | **`eventName`** | <code>'playerPosition'</code>                                                 |
 | **`listener`**  | <code>(event: <a href="#playerposition">PlayerPosition</a>) =&gt; void</code> |
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;PluginListenerHandle&gt;</code>
 
 --------------------
 
@@ -774,20 +756,22 @@ progress writes on the event and needs no timer of its own.
 
 #### PlayerConfig
 
-| Prop                   | Type                                                  | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ---------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`accentColor`**      | <code>string</code>                                   | The one colour you control. Accepts `#RGB`, `#RRGGBB`, `#AARRGGBB`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **`showPreviousNext`** | <code>boolean</code>                                  | Show previous/next. Off unless the host actually has a queue.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| **`title`**            | <code>string</code>                                   | Shown in fullscreen only — docked, the host page already has it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| **`subtitle`**         | <code>string</code>                                   | Second line under the title, e.g. a channel name. Fullscreen only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **`speedLabel`**       | <code>string</code>                                   | Current playback rate, shown on the speed button, e.g. `'1x'`. Displayed, not owned. The player surfaces the tap and you decide what a speed menu contains.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **`qualityLabel`**     | <code>string</code>                                   | Current quality, shown on the quality button, e.g. `'720p'`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| **`speeds`**           | <code>{}</code>                                       | Rows for the speed sheet. Plain strings are accepted as their own label. The player applies the speed itself and emits `speedSelected`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **`qualities`**        | <code>{}</code>                                       | Rows for the quality sheet. Unlike speed, the player *cannot* apply this — which track to use is an extraction decision, not a playback one. It emits `qualitySelected` and leaves you to reload at the chosen level.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| **`pip`**              | <code>boolean</code>                                  | Allow Picture-in-Picture. Off unless asked for. **This alone is not enough.** PiP shrinks the host's entire window, so the host must also declare it on its own Activity — a plugin's manifest cannot merge into an activity whose name it does not know: ```xml &lt;activity android:name=".MainActivity" android:supportsPictureInPicture="true" android:configChanges="screenSize\|smallestScreenSize\|screenLayout\|orientation" /&gt; ``` It also needs `androidx.core:core-pip` on your classpath — check `corePipAvailable`. With both in place the system enters PiP by itself when the user leaves the app, on **every** supported version: the library reaches `onUserLeaveHint` through `ComponentActivity` on Android 8–11 and auto-enter on 12+, so there is nothing version-specific for you to write. Pin `core-pip` to `1.0.0-alpha02`. alpha03 requires AGP 9.1.0, which Capacitor 8 apps do not ship — see docs/PLAYER.md. |
-| **`secure`**           | <code>boolean</code>                                  | Block screenshots and screen recording (`FLAG_SECURE`). A **window** flag, not a view one, so it necessarily covers the host's page too — there is no way to secure only the video. It also blanks the recents thumbnail and the PiP window, and on some devices disables casting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **`handleClose`**      | <code>boolean</code>                                  | The corner close button asks you instead of acting. Off by default: the X emits `closed` and the player releases itself, so it works even with no listener registered. Turned on, the X emits `closeRequested` and nothing else — you answer it, because "close" is ambiguous while the page that owns the video is on screen: re-dock the video into that page (`dock()` + `setMini(false)`) when it is, `release()` when it is not. Opting in and not answering leaves the X inert; that is the contract you sign by opting in.                                                                                                                                                                                                                                                                                                                                                                                                            |
-| **`button`**           | <code><a href="#playerbutton">PlayerButton</a></code> | One custom control, placed after speed and quality. Exactly one, deliberately: a variable number would shuffle the fixed buttons around and cost them their stable position.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Prop                   | Type                                                                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`accentColor`**      | <code>string</code>                                                 | The one colour you control. Accepts `#RGB`, `#RRGGBB`, `#AARRGGBB`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **`showPreviousNext`** | <code>boolean</code>                                                | Show previous/next. Off unless the host actually has a queue.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **`title`**            | <code>string</code>                                                 | Shown in fullscreen only — docked, the host page already has it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **`subtitle`**         | <code>string</code>                                                 | Second line under the title, e.g. a channel name. Fullscreen only.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **`speedLabel`**       | <code>string</code>                                                 | Current playback rate, shown on the speed button, e.g. `'1x'`. Displayed, not owned. The player surfaces the tap and you decide what a speed menu contains.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **`qualityLabel`**     | <code>string</code>                                                 | Current quality, shown on the quality button, e.g. `'720p'`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **`speeds`**           | <code>(string \| <a href="#playeroption">PlayerOption</a>)[]</code> | Rows for the speed sheet. Plain strings are accepted as their own label. The player applies the speed itself and emits `speedSelected`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **`qualities`**        | <code>(string \| <a href="#playeroption">PlayerOption</a>)[]</code> | Rows for the quality sheet. Unlike speed, the player *cannot* apply this — which track to use is an extraction decision, not a playback one. It emits `qualitySelected` and leaves you to reload at the chosen level.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **`qualityNote`**      | <code>string</code>                                                 | One line under the quality sheet's title — why some rows are disabled, for instance. Absent keeps the current note; an empty string removes it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **`pip`**              | <code>boolean</code>                                                | Allow Picture-in-Picture. Off unless asked for. **This alone is not enough.** PiP shrinks the host's entire window, so the host must also declare it on its own Activity — a plugin's manifest cannot merge into an activity whose name it does not know: ```xml &lt;activity android:name=".MainActivity" android:supportsPictureInPicture="true" android:configChanges="screenSize\|smallestScreenSize\|screenLayout\|orientation" /&gt; ``` It also needs `androidx.core:core-pip` on your classpath — check `corePipAvailable`. With both in place the system enters PiP by itself when the user leaves the app, on **every** supported version: the library reaches `onUserLeaveHint` through `ComponentActivity` on Android 8–11 and auto-enter on 12+, so there is nothing version-specific for you to write. Pin `core-pip` to `1.0.0-alpha02`. alpha03 requires AGP 9.1.0, which Capacitor 8 apps do not ship — see docs/PLAYER.md. |
+| **`secure`**           | <code>boolean</code>                                                | Block screenshots and screen recording (`FLAG_SECURE`). A **window** flag, not a view one, so it necessarily covers the host's page too — there is no way to secure only the video. It also blanks the recents thumbnail and the PiP window, and on some devices disables casting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **`handleClose`**      | <code>boolean</code>                                                | The corner close button asks you instead of acting. Off by default: the X emits `closed` and the player releases itself, so it works even with no listener registered. Turned on, the X emits `closeRequested` and nothing else — you answer it, because "close" is ambiguous while the page that owns the video is on screen: re-dock the video into that page (`dock()` + `setMini(false)`) when it is, `release()` when it is not. Opting in and not answering leaves the X inert; that is the contract you sign by opting in.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **`mini`**             | <code><a href="#playerminiconfig">PlayerMiniConfig</a></code>       | Geometry for the corner mini player. Merged onto the live config — see {@link <a href="#playerminiconfig">PlayerMiniConfig</a>}. Send it once with the rest of your `configure()`; it applies whenever the player is in the corner, including a corner it entered before this call.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **`button`**           | <code><a href="#playerbutton">PlayerButton</a></code>               | One custom control, placed after speed and quality. Exactly one, deliberately: a variable number would shuffle the fixed buttons around and cost them their stable position.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 
 #### PlayerOption
@@ -797,10 +781,37 @@ One row in the speed or quality sheet.
 The player presents these; it does not invent them. It has no way to know
 which quality levels your stream actually has.
 
-| Prop        | Type                |
-| ----------- | ------------------- |
-| **`id`**    | <code>string</code> |
-| **`label`** | <code>string</code> |
+| Prop           | Type                 | Description                                                                                                                                   |
+| -------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`id`**       | <code>string</code>  |                                                                                                                                               |
+| **`label`**    | <code>string</code>  |                                                                                                                                               |
+| **`icon`**     | <code>'saved'</code> | A glyph after the label. `saved` is a download-done tick, for the row that plays from a copy on the device.                                   |
+| **`disabled`** | <code>boolean</code> | Drawn dimmed and not tappable — a row that exists but cannot be chosen right now, such as a stream with no network. Say why in `qualityNote`. |
+
+
+#### PlayerMiniConfig
+
+Where the corner player sits, and how big it is.
+
+Host-supplied, because these are layout decisions the host owns rather than
+styling that would fragment the player's look. The margins in particular
+cannot be derived: the mini player lives inside the app's window, so what it
+has to clear is the host's own bottom nav or app bar, which Android has no
+inset for. Only the host knows its tab bar is 56dp tall.
+
+**Merged onto the live config, not onto the defaults.** An absent key keeps
+its current value, so `{ paddingBottom: 96 }` adjusts one side without
+silently resetting the width and corner it never mentioned.
+
+| Prop                | Type                                                          | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`width`**         | <code>number</code>                                           | Width in dp. Height follows from 16:9. Defaults to 190.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **`corner`**        | <code><a href="#playerminicorner">PlayerMiniCorner</a></code> | Defaults to `bottomRight`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **`paddingLeft`**   | <code>number</code>                                           | Insets per side, in dp — four numbers, not one vertical and one horizontal. The sides are genuinely different: a host typically has a tall bottom nav and a shorter top bar, so a single vertical margin either floats the player too high in one corner or lets it collide in the other. Four numbers also mean moving the player between corners needs no reconfiguration. Defaults: 14 left and right, 72 top, 42 bottom. The vertical pair are larger because a corner sits under the status bar and, in most hosts, an app bar too; the defaults clear a standard 56dp toolbar and a typical bottom nav. A host with taller chrome raises them, which is why these are props and not constants. |
+| **`paddingTop`**    | <code>number</code>                                           |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **`paddingRight`**  | <code>number</code>                                           |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **`paddingBottom`** | <code>number</code>                                           |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **`draggable`**     | <code>boolean</code>                                          | Whether the user may drag it to another corner. Defaults to true. The starting corner is still the host's choice; this decides whether the user can override it in the moment, as system PiP allows.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 
 #### PlayerButton
@@ -853,5 +864,12 @@ string. `keyBase64` exists for hosts with no native code of their own — it
 works, and it is weaker.
 
 <code>{ keyRef: string } | { keyBase64: string }</code>
+
+
+#### PlayerMiniCorner
+
+Which corner the mini player parks in.
+
+<code>'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight'</code>
 
 </docgen-api>

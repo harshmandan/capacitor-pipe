@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +40,10 @@ import androidx.compose.ui.unit.dp
 data class SheetOption(
     val id: String,
     val label: String,
+    /** `saved` draws a download-done glyph after the label; null draws none. */
+    val icon: String? = null,
+    /** False draws the row dimmed and ignores taps. */
+    val enabled: Boolean = true,
 )
 
 /**
@@ -66,6 +72,8 @@ internal fun PipePlayerSheet(
     onDismiss: () -> Unit,
     /** True while the player is fullscreen, so the sheet must stay immersive. */
     immersive: Boolean = false,
+    /** A line under the title, e.g. why some rows are disabled. */
+    note: String? = null,
 ) {
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
@@ -119,13 +127,22 @@ internal fun PipePlayerSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 24.dp, bottom = 8.dp),
                 )
+                if (!note.isNullOrEmpty()) {
+                    Text(
+                        text = note,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
+                    )
+                }
 
                 options.forEach { option ->
                     val selected = option.id == selectedId
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .clickable { settle { onSelect(option.id) } }
+                            .clickable(enabled = option.enabled) { settle { onSelect(option.id) } }
+                            .alpha(if (option.enabled) 1f else 0.38f)
                             .padding(horizontal = 24.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -134,6 +151,14 @@ internal fun PipePlayerSheet(
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                         )
+                        if (option.icon == "saved") {
+                            Icon(
+                                imageVector = PlayerIcons.DownloadDone,
+                                contentDescription = "Saved on this device",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 8.dp).size(18.dp),
+                            )
+                        }
                         Spacer(Modifier.weight(1f))
                         if (selected) {
                             // The tick is the one place a sheet picks up the

@@ -502,10 +502,12 @@ private fun Scrubber(
             val radius = CornerRadius(size.height / 2f)
             // Three layers: track, buffered, played. Buffered sits between the
             // two so a viewer can tell "not downloaded yet" from "not watched
-            // yet" — without it a stalled stream looks like a paused one.
-            drawRoundRect(color = Color.White.copy(alpha = 0.25f), cornerRadius = radius)
+            // yet" — without it a stalled stream looks like a paused one. It was
+            // 0.45 over a 0.25 track, too close to tell apart against video; the
+            // gap is what makes it readable.
+            drawRoundRect(color = Color.White.copy(alpha = 0.2f), cornerRadius = radius)
             drawRoundRect(
-                color = Color.White.copy(alpha = 0.45f),
+                color = Color.White.copy(alpha = 0.6f),
                 size = size.copy(width = size.width * bufferedFraction),
                 cornerRadius = radius,
             )

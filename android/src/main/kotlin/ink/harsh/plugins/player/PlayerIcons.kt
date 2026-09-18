@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 /**
- * The thirteen Material glyphs the player draws, as vectors of their own.
+ * The fourteen Material glyphs the player draws, as vectors of their own.
  *
  * **Extracted from `material-icons-extended`, not redrawn.** Every path call
  * below was read out of that artefact's own compiled classes, so each glyph is
@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
  * the first place.
  *
  * **Why they are here instead.** That artefact is 34 MB of about 2,100 icon
- * classes for these thirteen, and eleven of them are not in the 808 KB core set,
+ * classes for these fourteen, and twelve of them are not in the 808 KB core set,
  * so trimming to core was never an option. What is bought is a smaller APK and
  * one fewer dependency.
  *
@@ -521,6 +521,39 @@ object PlayerIcons {
             lineToRelative(5.66f, -8.49f)
             lineToRelative(-8.49f, 5.66f)
             arcToRelative(2f, 2f, 0f, false, false, 0f, 2.83f)
+            close()
+            }
+        }.build()
+    }
+
+    val DownloadDone: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Filled.DownloadDone",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(
+                fill = SolidColor(Color.Black),
+                stroke = null,
+                strokeLineWidth = 1f,
+                strokeLineCap = StrokeCap.Butt,
+                strokeLineJoin = StrokeJoin.Bevel,
+                strokeLineMiter = 1f,
+                pathFillType = PathFillType.NonZero,
+            ) {
+            moveTo(20.13f, 5.41f)
+            lineToRelative(-1.41f, -1.41f)
+            lineToRelative(-9.19f, 9.19f)
+            lineToRelative(-4.25f, -4.24f)
+            lineToRelative(-1.41f, 1.41f)
+            lineToRelative(5.66f, 5.66f)
+            close()
+            moveTo(5f, 18f)
+            horizontalLineToRelative(14f)
+            verticalLineToRelative(2f)
+            horizontalLineToRelative(-14f)
             close()
             }
         }.build()

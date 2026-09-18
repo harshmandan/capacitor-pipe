@@ -131,7 +131,12 @@ open class PipePlayerPlugin : Plugin() {
         return (0 until array.length()).mapNotNull { index ->
             array.optJSONObject(index)?.let { item ->
                 val id = item.optString("id").takeIf { it.isNotEmpty() } ?: return@mapNotNull null
-                SheetOption(id, item.optString("label").ifEmpty { id })
+                SheetOption(
+                    id = id,
+                    label = item.optString("label").ifEmpty { id },
+                    icon = item.optString("icon").takeIf { it.isNotEmpty() },
+                    enabled = !item.optBoolean("disabled", false),
+                )
             } ?: array.optString(index).takeIf { it.isNotEmpty() }?.let { SheetOption(it, it) }
         }
     }
@@ -355,6 +360,7 @@ open class PipePlayerPlugin : Plugin() {
                 qualityLabel = call.getString("qualityLabel"),
                 speeds = sheetOptions(call, "speeds"),
                 qualities = sheetOptions(call, "qualities"),
+                qualityNote = call.getString("qualityNote"),
                 extraButton = button,
                 extraButtonProvided = buttonProvided,
                 handleClose = call.getBoolean("handleClose"),
