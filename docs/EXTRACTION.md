@@ -56,6 +56,32 @@ Videos used in the observations below:
 
 ---
 
+## 2026-09-18 · NewPipe dev `ab984a8` loses that file; the pins stay
+
+**Measured** the same day, same video, same emulator, after
+`update-extractors.sh` moved both engines to upstream heads (PipePipe `c0cd0d6`,
+v5.3.1; NewPipe dev `ab984a8`). The script's own checks passed — API surface
+intact, all 39 divergence checks hold — and the app compiled.
+
+```
+newpipe  ab984a8 (new) | UNPLAYABLE "This video is not available"  | 17s
+newpipe  f9e6bb8 (pin) | muxed 360p (progressive)                  | 4s   ← rebuilt, asked right after
+pipepipe c0cd0d6 (new) | no usable answer                           |      ← not isolated
+```
+
+The pinned NewPipe answering right after rules out the address being throttled.
+The likely cause is upstream `9ed62db` "Remove usage of ANDROID, IOS and
+WEB_EMBEDDED_PLAYER clients": the client that served the 360p file is gone.
+
+**Decided.** Neither pin moves. NewPipe's update removes the one thing it is
+here for (a file for a video PipePipe calls SABR-only); PipePipe's gives nothing
+tutorgrow uses (`2a9a92f` removes the Android VR endpoint; the rest is
+Bilibili, NicoNico and Bandcamp) and its one result was unreadable, so it is not
+worth a pin move on its own. **Re-measure on the next update, with this video
+and one engine at a time**, and do not trust the script's green checks as
+evidence that extraction still works — they check our API surface, not
+YouTube.
+
 ## 2026-09-18 · NewPipe has a file for a video PipePipe calls SABR-only
 
 **Measured** on an API 34 emulator, through tutorgrow's WebView over CDP, one
