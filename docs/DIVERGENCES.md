@@ -271,10 +271,13 @@ affected" — client-hopping, explicitly a workaround. Two consequences we inher
 set by YouTube, which is why #12248 stays open. Treat NewPipe's SABR-adjacent
 viability as time-limited.
 
-**Consequence for the fallback:** NewPipe cannot rescue a SABR-only video. The
-fallback covers a different failure — PipePipe defers signature deciphering to a
-PipePipe-hosted service, NewPipe does it locally in Rhino, so NewPipe survives
-outages of that service. Do not expect it to cover SABR.
+**Consequence for the fallback:** `requiresSabr` is PipePipe's verdict for
+*its* client, not a property of the video, so NewPipe **can** rescue a video
+PipePipe calls SABR-only — measured, `EXTRACTION.md` 2026-09-18. Only as far as
+360p: NewPipe's client got one muxed file and no adaptive tracks. It also covers
+a second failure — PipePipe defers signature deciphering to a PipePipe-hosted
+service, NewPipe does it locally in Rhino, so NewPipe survives outages of that
+service. Both hold only while YouTube leaves NewPipe's client unenforced.
 
 **On upgrade (NewPipe):** if upstream implements SABR, revisit this whole file —
 the engines would become genuinely equivalent and `requiresSabr: false` would

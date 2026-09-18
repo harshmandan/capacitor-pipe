@@ -56,6 +56,30 @@ Videos used in the observations below:
 
 ---
 
+## 2026-09-18 · NewPipe has a file for a video PipePipe calls SABR-only
+
+**Measured** on an API 34 emulator, through tutorgrow's WebView over CDP, one
+video from a production download failure (a 1-hour lecture, not in the table
+above), `engines` pinned to one at a time:
+
+```
+pipepipe | requiresSabr true  | muxed none           | video-only 3 (SABR) | audio 2 (SABR) | 37s
+newpipe  | requiresSabr false | muxed 360p (progressive) | video-only 0     | audio 0        | 4s
+```
+
+The NewPipe URL fetched: `206` to a 1 MB range request, `video/mp4`,
+`Content-Length` 111 MB.
+
+**Why.** Same cause as the 2026-08-20 entry: the engines ask as different
+InnerTube clients and YouTube enforces SABR on PipePipe's. `requiresSabr` is an
+answer about the client that asked.
+
+**Decided.** A consumer that wants a *file* — a downloader — asks NewPipe before
+concluding there is none; tutorgrow's download does. `DIVERGENCES.md` §8 said
+the opposite ("cannot rescue a SABR-only video"), reasoned rather than measured,
+and is corrected. A player still prefers a SABR session for such a video: it
+plays above 360p, which NewPipe's single muxed file cannot.
+
 ## 2026-08-20 · YouTube no longer serves itag 18 to the PipePipe client
 
 **Measured** on an API 34 emulator, both videos, `extractStreamInfo` with
