@@ -98,6 +98,8 @@ internal data class PipePlayerChromeState(
     val speedLabel: String,
     /** Current quality, e.g. "720p". */
     val qualityLabel: String,
+    /** The quality plays from a copy on the device: a download tick after the label. */
+    val qualityDownloaded: Boolean = false,
     /** At most one, occupying the third slot in the top row. */
     val extraButton: PipePlayerExtraButton?,
 )
@@ -274,9 +276,10 @@ private fun TopRow(
             ValueButton(
                 PlayerIcons.HighQuality,
                 state.qualityLabel,
-                "Quality",
+                if (state.qualityDownloaded) "Quality, downloaded" else "Quality",
                 callbacks.onQuality,
                 metrics,
+                trailing = if (state.qualityDownloaded) PlayerIcons.DownloadDone else null,
             )
             state.extraButton?.let { button ->
                 Spacer(Modifier.width(6.dp))
@@ -668,6 +671,8 @@ private fun ValueButton(
     description: String,
     onClick: () -> Unit,
     metrics: ChromeMetrics,
+    /** A second glyph after the label — the download tick on a saved copy. */
+    trailing: ImageVector? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -697,6 +702,10 @@ private fun ValueButton(
                 fontWeight = FontWeight.Medium,
             ),
         )
+        if (trailing != null) {
+            Spacer(Modifier.width(4.dp))
+            Glyph(trailing, metrics.glyph)
+        }
     }
 }
 

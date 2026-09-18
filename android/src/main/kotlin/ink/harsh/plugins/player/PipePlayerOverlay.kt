@@ -288,9 +288,12 @@ class PipePlayerOverlay(private val activity: Activity) {
     private val speedLabel = mutableStateOf("1x")
     private val qualityLabel = mutableStateOf("Auto")
     private val speedOptions =
-        mutableStateOf(listOf("0.5x", "1x", "1.5x", "2x").map { SheetOption(it, it) })
+        mutableStateOf(
+            listOf("0.5x", "0.75x", "1x", "1.25x", "1.5x", "1.75x", "2x").map { SheetOption(it, it) },
+        )
     private val qualityOptions = mutableStateOf(listOf(SheetOption("Auto", "Auto")))
     private val qualityNote = mutableStateOf<String?>(null)
+    private val qualityDownloaded = mutableStateOf(false)
 
     /**
      * The current media came from local files rather than a URL.
@@ -571,6 +574,7 @@ class PipePlayerOverlay(private val activity: Activity) {
                     showPreviousNext = showPreviousNext.value,
                     speedLabel = speedLabel.value,
                     qualityLabel = qualityLabel.value,
+                    qualityDownloaded = qualityDownloaded.value,
                     extraButton = extraButton.value,
                 ),
                 // As State, not fields: the 4Hz tick then invalidates only the
@@ -1621,6 +1625,8 @@ class PipePlayerOverlay(private val activity: Activity) {
         qualities: List<SheetOption>?,
         /** Null keeps the current note; an empty string removes it. */
         qualityNote: String?,
+        /** `downloaded` or `default`; null keeps the current glyph. */
+        qualityIcon: String?,
         /**
          * Split into value + provided, unlike every sibling: null means REMOVE
          * for a button — a host must be able to take its extra button down —
@@ -1643,6 +1649,7 @@ class PipePlayerOverlay(private val activity: Activity) {
         speeds?.let { this.speedOptions.value = it }
         qualities?.let { this.qualityOptions.value = it }
         qualityNote?.let { this.qualityNote.value = it.ifEmpty { null } }
+        qualityIcon?.let { this.qualityDownloaded.value = it == "downloaded" }
         qualityLabel?.let { this.qualityLabel.value = it }
         if (extraButtonProvided) this.extraButton.value = extraButton
     }
@@ -1657,7 +1664,6 @@ class PipePlayerOverlay(private val activity: Activity) {
             title = if (speed) "Playback speed" else "Quality",
             options = if (speed) speedOptions.value else qualityOptions.value,
             selectedId = if (speed) speedLabel.value else qualityLabel.value,
-            accent = accent.value,
             onSelect = { id ->
                 openSheet.value = null
                 if (speed) {
@@ -1667,8 +1673,11 @@ class PipePlayerOverlay(private val activity: Activity) {
                 } else {
                     // The player cannot switch quality itself — that is an
                     // extractor/track decision — so it reports and lets the
-                    // host reload at the chosen level.
-                    qualityLabel.value = id
+                    // host reload at the chosen level. The button shows the
+                    // row's LABEL meanwhile: it showed the id, which put
+                    // `saved` or `720` on the chip until the host answered.
+                    qualityLabel.value =
+                        qualityOptions.value.firstOrNull { it.id == id }?.label ?: id
                     onChromeEvent?.invoke("qualitySelected", id)
                 }
             },

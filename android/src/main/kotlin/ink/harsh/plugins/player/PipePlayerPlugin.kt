@@ -134,7 +134,8 @@ open class PipePlayerPlugin : Plugin() {
                 SheetOption(
                     id = id,
                     label = item.optString("label").ifEmpty { id },
-                    icon = item.optString("icon").takeIf { it.isNotEmpty() },
+                    detail = item.optString("detail").takeIf { it.isNotEmpty() },
+                    selected = if (item.has("selected")) item.optBoolean("selected") else null,
                     enabled = !item.optBoolean("disabled", false),
                 )
             } ?: array.optString(index).takeIf { it.isNotEmpty() }?.let { SheetOption(it, it) }
@@ -361,6 +362,7 @@ open class PipePlayerPlugin : Plugin() {
                 speeds = sheetOptions(call, "speeds"),
                 qualities = sheetOptions(call, "qualities"),
                 qualityNote = call.getString("qualityNote"),
+                qualityIcon = call.getString("qualityIcon"),
                 extraButton = button,
                 extraButtonProvided = buttonProvided,
                 handleClose = call.getBoolean("handleClose"),

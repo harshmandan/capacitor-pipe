@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.ui.draw.alpha
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -40,8 +39,10 @@ import androidx.compose.ui.unit.dp
 data class SheetOption(
     val id: String,
     val label: String,
-    /** `saved` draws a download-done glyph after the label; null draws none. */
-    val icon: String? = null,
+    /** Muted text after the label, e.g. `Downloaded`. */
+    val detail: String? = null,
+    /** The host says this row is the one playing. Null leaves it to [selectedId]. */
+    val selected: Boolean? = null,
     /** False draws the row dimmed and ignores taps. */
     val enabled: Boolean = true,
 )
@@ -67,7 +68,6 @@ internal fun PipePlayerSheet(
     title: String,
     options: List<SheetOption>,
     selectedId: String?,
-    accent: Color,
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
     /** True while the player is fullscreen, so the sheet must stay immersive. */
@@ -136,8 +136,15 @@ internal fun PipePlayerSheet(
                     )
                 }
 
+                // A host that marks a row decides the tick outright; otherwise the
+                // button's label names it, by id or by label.
+                val hostMarked = options.any { it.selected != null }
                 options.forEach { option ->
-                    val selected = option.id == selectedId
+                    val selected = if (hostMarked) {
+                        option.selected == true
+                    } else {
+                        option.id == selectedId || option.label == selectedId
+                    }
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -151,22 +158,22 @@ internal fun PipePlayerSheet(
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                         )
-                        if (option.icon == "saved") {
-                            Icon(
-                                imageVector = PlayerIcons.DownloadDone,
-                                contentDescription = "Saved on this device",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 8.dp).size(18.dp),
+                        if (!option.detail.isNullOrEmpty()) {
+                            Text(
+                                text = option.detail,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(start = 8.dp),
                             )
                         }
                         Spacer(Modifier.weight(1f))
                         if (selected) {
-                            // The tick is the one place a sheet picks up the
-                            // consumer's accent.
+                            // White, like the label: the consumer's accent read
+                            // as an error mark on the dark sheet when it was red.
                             Icon(
                                 imageVector = PlayerIcons.Check,
                                 contentDescription = null,
-                                tint = accent,
+                                tint = Color.White,
                             )
                         }
                     }

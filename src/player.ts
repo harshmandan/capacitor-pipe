@@ -88,10 +88,15 @@ export interface PlayerOption {
   id: string;
   label: string;
   /**
-   * A glyph after the label. `saved` is a download-done tick, for the row that
-   * plays from a copy on the device.
+   * Secondary text after the label, in the sheet's muted colour — e.g.
+   * `Downloaded` on the row that plays from a copy on the device.
    */
-  icon?: 'saved';
+  detail?: string;
+  /**
+   * The row that is playing now, ticked. When no row sets it, the player ticks
+   * the row whose id or label matches the button's label.
+   */
+  selected?: boolean;
   /**
    * Drawn dimmed and not tappable — a row that exists but cannot be chosen
    * right now, such as a stream with no network. Say why in `qualityNote`.
@@ -256,6 +261,12 @@ export interface PlayerConfig {
    * instance. Absent keeps the current note; an empty string removes it.
    */
   qualityNote?: string;
+  /**
+   * `downloaded` adds a download-done tick after the quality button's label,
+   * for a video playing from a copy on the device; `default` removes it.
+   * Absent keeps the current state.
+   */
+  qualityIcon?: 'default' | 'downloaded';
   /**
    * Allow Picture-in-Picture. Off unless asked for.
    *
