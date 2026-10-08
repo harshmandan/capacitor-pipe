@@ -385,10 +385,10 @@ contract both must satisfy.
 | Module layout | `:extractor` + `:timeago-parser` (separate jars) | timeago compiled *into* the extractor jar | 3 jars vs 1 |
 | protobuf | `protobuf-java` (full) | `protobuf-javalite` | NewPipe's bundled + relocated |
 | nanojson | commit `1d9e1aea` | commit `e9d656dd` | NewPipe's bundled + relocated |
-| jsoup | 1.22.2 | 1.22.2 | shared, not bundled |
+| jsoup | 1.22.2 | 1.22.2 | shared, not bundled; declared at 1.23.2 |
 | rhino | not used | 1.8.1 | declared normally; **stay on 1.8.1**, 1.9.0 needs minSdk 26 |
-| wire | 6.4.1, used | not used | `wire-runtime` declared |
-| okhttp | 5.4.0, **in its public API** | test-only | pinned to 5.4.0 |
+| wire | 6.4.1, used | not used | `wire-runtime` declared, at 7.1.0 |
+| okhttp | 5.4.0, **in its public API** | test-only | pinned to 5.4.0; 5.5.0 also needs compileSdk 37 |
 
 The toolchain override is forced for *different reasons*: PipePipe's 25 produces
 class-file 69 that AGP 8 / D8 rejects; NewPipe's 11 simply is not installed.

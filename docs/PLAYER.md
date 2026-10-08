@@ -25,12 +25,12 @@ implementation 'androidx.compose.ui:ui'
 implementation 'androidx.compose.foundation:foundation'
 implementation 'androidx.compose.material:material-icons-extended'
 implementation 'androidx.compose.material3:material3'   // ModalBottomSheet only
-implementation 'androidx.activity:activity-compose:1.12.4'
+implementation 'androidx.activity:activity-compose:1.13.0'
 
-implementation 'androidx.media3:media3-exoplayer:1.9.0'
-implementation 'androidx.media3:media3-exoplayer-hls:1.9.0'    // live streams
-implementation 'androidx.media3:media3-exoplayer-dash:1.9.0'   // SABR manifests
-implementation 'androidx.media3:media3-ui-compose:1.9.0'       // video sizing
+implementation 'androidx.media3:media3-exoplayer:1.11.1'
+implementation 'androidx.media3:media3-exoplayer-hls:1.11.1'   // live streams
+implementation 'androidx.media3:media3-exoplayer-dash:1.11.1'  // SABR manifests
+implementation 'androidx.media3:media3-ui-compose:1.11.1'      // video sizing
 implementation 'androidx.window:window:1.5.1'                  // window metrics
 
 // Picture-in-Picture only. Skip both if you do not use PiP.

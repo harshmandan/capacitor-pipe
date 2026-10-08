@@ -345,7 +345,7 @@ class PipeSabrBridge(
     }
 
     private fun cacheMedia(format: YoutubeSabrInfo.Format, segment: SabrMediaSegment) {
-        val key = SabrSegmentKey.media(format, segment.header.sequenceNumber.toInt())
+        val key = SabrSegmentKey.media(format, segment.header.sequenceNumber)
         synchronized(ahead) {
             if (stopped) {
                 segment.delete()

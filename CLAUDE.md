@@ -198,15 +198,15 @@ generify it.
 | ---------- | ---------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | protobuf   | `protobuf-java` (full)       | `protobuf-javalite` | Collide on `com.google.protobuf.*`, not co-installable. NewPipe's is bundled + relocated.                                                                                                                                                           |
 | nanojson   | commit `1d9e1aea`            | commit `e9d656dd`   | Same artifact, different pins. NewPipe's is bundled + relocated.                                                                                                                                                                                    |
-| jsoup      | 1.22.2                       | 1.22.2              | Identical — shared, not bundled.                                                                                                                                                                                                                    |
+| jsoup      | 1.22.2                       | 1.22.2              | Identical — shared, not bundled. Declared at 1.23.2, a minor past what both compile against.                                                                                                                                                        |
 | rhino      | not used                     | 1.8.1               | NewPipe only. **Stay on 1.8.1** — 1.9.0 requires minSdk 26.                                                                                                                                                                                         |
-| okhttp     | **5.4.0, in its public API** | test-only           | PipePipe leaks okhttp into the `Downloader` contract: `CancellableCall(okhttp3.Call)`. Our PipePipe `Downloader` must return okhttp-backed calls, and the version must match what the extractor was compiled against. NewPipe has no such coupling. |
-| wire       | 6.4.1, used                  | —                   | Needed at runtime (18 references). Must declare `wire-runtime`.                                                                                                                                                                                     |
+| okhttp     | **5.4.0, in its public API** | test-only           | PipePipe leaks okhttp into the `Downloader` contract: `CancellableCall(okhttp3.Call)`. Our PipePipe `Downloader` must return okhttp-backed calls, and the version must match what the extractor was compiled against. NewPipe has no such coupling. 5.5.0 is out of reach anyway: its `okhttp-android` AAR needs compileSdk 37. |
+| wire       | 6.4.1, used                  | —                   | Needed at runtime (18 references). Must declare `wire-runtime` — at 7.1.0; PipePipe's generated code is from 6.4.1, and 7.0's one runtime change is spec-correct merging of repeated embedded messages.                                             |
 
 ### 4. Capacitor 8 build requirements
 
 minSdk 24, compileSdk 36, targetSdk 36, AGP 8.13.0, Gradle 8.14.3, Kotlin
-2.2.20. Capacitor **8.5 is iOS-only** (UIScene lifecycle) — no Android impact
+2.3.21. Capacitor **8.5 is iOS-only** (UIScene lifecycle) — no Android impact
 here, and this plugin has no iOS side at all.
 
 ### 5. PipePipe's YouTube path depends on a remote service
