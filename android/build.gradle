@@ -290,6 +290,11 @@ dependencies {
     androidTestImplementation 'androidx.dynamicanimation:dynamicanimation:1.1.0'
 
     testImplementation "junit:junit:$junitVersion"
+    // Not used by any unit test: the Compose compiler plugin refuses to compile
+    // a source set without the runtime on its classpath, and Compose is
+    // compileOnly above, so the JVM tests would not build at all.
+    testImplementation platform("androidx.compose:compose-bom:$composeBomVersion")
+    testImplementation 'androidx.compose.runtime:runtime'
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
 

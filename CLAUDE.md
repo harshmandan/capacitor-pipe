@@ -706,6 +706,14 @@ note any behavioural change in the header, as `PipeSabrBridge` does for its
 
 Sessions hold a segment cache and a WebView-minted token. They must be closed.
 
+A reopen of the same video URL (a quality switch) reuses the previous
+extraction for up to 20 minutes, bounded by the streaming URL's `expire`
+(`PipeSabrExtractionCache`). That is safe because `YoutubeSabrInfo` is
+immutable and each session keeps its own token copy; if a reused extraction
+fails to open, `PipeSabrManager.open` extracts once more. The key is the URL as
+the caller wrote it, so a caller that rewrites the URL between opens loses the
+reuse, not correctness.
+
 ## Conventions
 
 - Android-only. The web implementation is a stub that reports unavailability —

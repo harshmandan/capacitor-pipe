@@ -43,6 +43,9 @@ class PipeSabrManager(context: Context, private val engine: PipePipeEngine) {
      * Blocking and slow — it performs an extraction and then several SABR
      * round trips to learn the segment timelines before a manifest can exist.
      * Never call from the main thread.
+     *
+     * A reopen of the same video within [PipeSabrExtractionCache]'s window
+     * skips the extraction, which is most of what a quality switch waits for.
      */
     @JvmOverloads
     @Throws(Exception::class)
@@ -55,8 +58,29 @@ class PipeSabrManager(context: Context, private val engine: PipePipeEngine) {
         // so installing it afterwards is too late for this session.
         PipeSabrPoTokens.enableMinting(context)
 
+        val cached = PipeSabrExtractionCache.get(request)
+        if (cached != null) {
+            try {
+                return openWith(cached, startPositionMs, maxHeight, reused = true)
+            } catch (e: Exception) {
+                // A reused extraction can go stale before its URL says so; one
+                // fresh extraction settles whether that was the cause.
+                Log.w(TAG, "Reused SABR extraction failed, extracting again: $e")
+                PipeSabrExtractionCache.evict(request)
+            }
+        }
         val extraction = engine.extractSabrInfo(request)
+        val opened = openWith(extraction, startPositionMs, maxHeight, reused = false)
+        PipeSabrExtractionCache.put(request, extraction)
+        return opened
+    }
 
+    private fun openWith(
+        extraction: PipePipeEngine.SabrExtraction,
+        startPositionMs: Long,
+        maxHeight: Int,
+        reused: Boolean,
+    ): PipeSabrSession {
         val sessionId = UUID.randomUUID().toString().replace("-", "")
         val spool = File(context.cacheDir, "sabr/$sessionId")
         if (!spool.mkdirs() && !spool.isDirectory) {
@@ -99,7 +123,8 @@ class PipeSabrManager(context: Context, private val engine: PipePipeEngine) {
                 TAG,
                 "SABR session " + sessionId + " open for " + extraction.info.videoId +
                     " (" + spec.audioFormats.size + " audio, " +
-                    spec.videoFormats.size + " video formats)",
+                    spec.videoFormats.size + " video formats" +
+                    (if (reused) ", reused extraction)" else ")"),
             )
             return opened
         } catch (e: Throwable) {
