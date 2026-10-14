@@ -56,6 +56,41 @@ Videos used in the observations below:
 
 ---
 
+## 2026-10-14 · NewPipe's update drops the muxed file on ordinary videos too; a PO token cannot help
+
+**Measured** on the `Pixel_9_API_34` emulator through the example app's WebView
+over CDP, `engines: ["newpipe"]`, the same video and the same hour, one
+extraction per build:
+
+```
+iUtnZpzkbG8  newpipe f9e6bb8 (pin) | muxed 360p (progressive, range 206) | video-only 12 | audio 5
+iUtnZpzkbG8  newpipe 8443c91 (dev) | muxed none                          | video-only 12 | audio 5   ← 360p video-only URL: range 206
+jNQXAC9IVRw  newpipe 8443c91 (dev) | muxed none                          | video-only 5  | audio 5
+```
+
+So the update still plays ordinary videos from separate video and audio streams,
+but the single muxed file is gone everywhere, not only on the SABR-only lecture
+from 2026-09-18. That file is what a downloader wants, and the reason NewPipe is
+here (2026-09-18 entries below).
+
+**A PO token is not the fix, by reading the code.** The NewPipe *app* mints
+WEB-client PO tokens in a WebView and installs them with
+`YoutubeStreamExtractor.setPoTokenProvider`, which made it look like the missing
+piece. But since `9ed62db` that method's body is `// Nothing to do for now`; its
+javadoc says no client the extractor uses supports PO tokens "until SABR support
+is added". Streams come only from the VISIONOS client, and the WEB request is
+metadata only. That holds at the commit the app pins (`3313901`) too, so the
+app's minting currently has no effect. No device run was made for this; the code
+rules it out.
+
+**Decided.** The NewPipe pin stays at `f9e6bb8`. Re-check when NewPipe adds SABR
+or another client that serves muxed formats: then `setPoTokenProvider` stops
+being a no-op, and our WebView minter (`PipeBotGuardMinter`) could feed it.
+
+The lecture video from 2026-09-18 is still not recorded by id anywhere in this
+repo or tutorgrow, so it was not re-measured. Next time it is found, write its
+id into the table at the top.
+
 ## 2026-10-14 · PipePipe v5.4.0: `tv_samsung` is bot-checked, `visionos` still works
 
 **Measured** on the `Pixel_9_API_34` emulator with `PlayerClientProbeTest`,
@@ -88,10 +123,7 @@ that called PipePipe without setting a client would now get the bot check.
 `check-divergences.sh` asserts the upstream default literal, so the next time it
 moves, the update goes red and this gets measured again.
 
-**NewPipe held, not re-measured.** NewPipe dev `8443c91` still contains
-`9ed62db`, which removes the client that served the 360p file below, and nothing
-since brings it back. Per the decision below, the NewPipe pin stays at
-`f9e6bb8`.
+**NewPipe held.** Measured the same day; see the entry above.
 
 ## 2026-09-18 · NewPipe dev `ab984a8` loses that file; the pins stay
 
