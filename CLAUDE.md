@@ -89,7 +89,7 @@ on. Add to them whenever the wrapper starts calling something new.
 [docs/DIVERGENCES.md](docs/DIVERGENCES.md) records every point where our code forks to
 handle the two engines differently, with file and symbol anchors and what to
 re-check per dependency. `scripts/check-divergences.sh` asserts them against both
-submodules' source (39 checks), and `update-extractors.sh` runs it before
+submodules' source (41 checks), and `update-extractors.sh` runs it before
 rebuilding, rolling the pins back if anything changed.
 
 ```bash
@@ -247,8 +247,10 @@ else
 
 Modern player responses usually include `serverAbrStreamingUrl` **alongside**
 ordinary formats, so pinning `mweb` globally forces a session driver, a PO token
-and a WebView onto videos that had a perfectly good URL. The extractor's default
-is `visionos`, not `mweb`.
+and a WebView onto videos that had a perfectly good URL. Pass 1 uses `visionos`,
+set explicitly. Upstream's own default is `tv_samsung` since v5.4.0, and that
+client was bot-checked on every video when measured (EXTRACTION.md,
+2026-10-14).
 
 `PipePipeEngine` therefore extracts with the default client first and retries on
 `mweb` only when that yields nothing playable. The setting is global mutable

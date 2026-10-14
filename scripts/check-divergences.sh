@@ -152,6 +152,8 @@ else
 fi
 
 head2 "9. Player-client constants"
+assert_grep 9 yes "$PP/NewPipe.java" \
+    'youtubePlayerClient = "tv_samsung"' "upstream default client is still tv_samsung (we pin visionos)"
 for client in visionos mweb; do
     assert_grep 9 yes "$PP/NewPipe.java" \
         "\"$client\"" "setYoutubePlayerClient still accepts \"$client\""

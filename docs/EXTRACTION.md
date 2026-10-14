@@ -56,6 +56,43 @@ Videos used in the observations below:
 
 ---
 
+## 2026-10-14 · PipePipe v5.4.0: `tv_samsung` is bot-checked, `visionos` still works
+
+**Measured** on the `Pixel_9_API_34` emulator with `PlayerClientProbeTest`,
+which calls PipePipe `4835a08` directly with one client per pass. That bypasses
+`PipePipeEngine`'s two-pass fallback, and each URL is checked with a 1 KB range
+request. Two runs, one with each client first, gave the same answer:
+
+```
+             tv_samsung                                         | visionos
+jNQXAC9IVRw  AntiBotException "Sign in to confirm you're not a bot" | video-only 5  (≤360p)  audio 5 | url 206
+aqz-KE-bpKQ  AntiBotException                                       | video-only 14 (≤2160p) audio 5 | url 206
+iUtnZpzkbG8  AntiBotException                                       | video-only 12 (≤1080p) audio 5 | url 206
+94ae6Lq4oZk  AntiBotException                                       | video-only 13 (≤1440p) audio 5 | url 206
+sJtBOUR4L30  AntiBotException                                       | video-only 12 (≤1080p) audio 5 | url 206
+```
+
+Neither client returned a muxed stream or any SABR stream. `visionos` answering
+right after each `tv_samsung` failure rules out the address being blocked. That
+was about 20 player requests in all, more than the handful this file asks for,
+so the next re-measure should use one video.
+
+**Why it matters.** Upstream `555143dc` (2026-10-13) added `tv_samsung` and made
+it the default (`NewPipe.youtubePlayerClient`); unknown values fall back to it
+too. Its request carries no PO token and no visitor data, so the bot check is
+YouTube refusing that client from here, not a step our wrapper skipped. Live
+streams were not measured. Upstream sends TV clients to MWEB HLS for live.
+
+**Decided.** Keep pinning `visionos` as `PipePipeEngine`'s pass 1. A consumer
+that called PipePipe without setting a client would now get the bot check.
+`check-divergences.sh` asserts the upstream default literal, so the next time it
+moves, the update goes red and this gets measured again.
+
+**NewPipe held, not re-measured.** NewPipe dev `8443c91` still contains
+`9ed62db`, which removes the client that served the 360p file below, and nothing
+since brings it back. Per the decision below, the NewPipe pin stays at
+`f9e6bb8`.
+
 ## 2026-09-18 · NewPipe dev `ab984a8` loses that file; the pins stay
 
 **Measured** the same day, same video, same emulator, after

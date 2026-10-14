@@ -329,7 +329,11 @@ else
 So `mweb` means *prefer SABR*, not *support SABR*. Pinning it globally would
 force a session driver onto videos that have a perfectly good URL.
 
-- `engine/PipePipeEngine.kt` — `visionos` default, `mweb` for SABR
+- `engine/PipePipeEngine.kt` — `visionos` for pass 1, `mweb` for SABR. Both
+  are set explicitly: upstream's own default has been `tv_samsung` since
+  v5.4.0, and unknown values fall back to it. `check-divergences.sh` asserts
+  that default, so a change shows up as a red check rather than a silent shift
+  (EXTRACTION.md, 2026-10-14, for why we don't follow it).
 - `engine/PipePipeEngine.kt` — pass 1 default, pass 2 `mweb`, always
   restored in `finally`, whole sequence under `CLIENT_LOCK`
 
