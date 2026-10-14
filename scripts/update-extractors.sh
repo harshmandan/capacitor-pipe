@@ -40,24 +40,59 @@ die()  { printf '\033[1;31mError:\033[0m %s\n' "$*" >&2; exit 1; }
 # any of these, the plugin stops compiling — better to find out here, with the
 # old pin still recoverable, than midway through an app build.
 #
-# Keep in sync with android/src/main/kotlin/ink/harsh/plugins/pipe/.
+# Keep in sync with android/src/main/kotlin/ink/harsh/plugins/pipe/: every
+# extractor class imported there, plus StreamingService (reached through
+# ServiceList.YouTube) and NewPipe's Description (reached through
+# StreamInfo.getDescription, and a record since upstream #1486).
 PIPEPIPE_API=(
+    "extractor/src/main/java/org/schabi/newpipe/extractor/Image.java"
     "extractor/src/main/java/org/schabi/newpipe/extractor/NewPipe.java"
-    "extractor/src/main/java/org/schabi/newpipe/extractor/StreamingService.java"
     "extractor/src/main/java/org/schabi/newpipe/extractor/ServiceList.java"
-    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamInfo.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/StreamingService.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/downloader/CancellableCall.java"
     "extractor/src/main/java/org/schabi/newpipe/extractor/downloader/Downloader.java"
-    "extractor/src/main/java/org/schabi/newpipe/extractor/services/youtube/sabr/YoutubeSabrSession.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/downloader/Request.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/downloader/Response.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/downloader/StreamingResponse.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/exceptions/ExtractionException.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/exceptions/ReCaptchaException.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/localization/ContentCountry.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/localization/Localization.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/services/youtube/YoutubePoTokenResult.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/services/youtube/sabr/YoutubeSabrFormatTimeline.java"
     "extractor/src/main/java/org/schabi/newpipe/extractor/services/youtube/sabr/YoutubeSabrInfo.java"
     "extractor/src/main/java/org/schabi/newpipe/extractor/services/youtube/sabr/YoutubeSabrRequest.java"
-    "extractor/src/main/java/org/schabi/newpipe/extractor/services/youtube/sabr/YoutubeSabrFormatTimeline.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/services/youtube/sabr/YoutubeSabrSession.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/services/youtube/sabr/exception/SabrAttestationException.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/services/youtube/sabr/exception/SabrProtocolException.java"
     "extractor/src/main/java/org/schabi/newpipe/extractor/services/youtube/sabr/media/SabrMediaSegment.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/services/youtube/sabr/protocol/SabrStreamingResponseReader.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/sponsorblock/SponsorBlockApiSettings.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/AudioStream.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/DeliveryMethod.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/Stream.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamInfo.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamType.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/SubtitlesStream.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/VideoStream.java"
 )
 NEWPIPE_API=(
+    "extractor/src/main/java/org/schabi/newpipe/extractor/Image.java"
     "extractor/src/main/java/org/schabi/newpipe/extractor/NewPipe.java"
     "extractor/src/main/java/org/schabi/newpipe/extractor/ServiceList.java"
-    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamInfo.java"
     "extractor/src/main/java/org/schabi/newpipe/extractor/downloader/Downloader.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/downloader/Request.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/downloader/Response.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/exceptions/ReCaptchaException.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/localization/ContentCountry.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/localization/Localization.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/AudioStream.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/Description.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/Stream.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamInfo.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/StreamType.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/SubtitlesStream.java"
+    "extractor/src/main/java/org/schabi/newpipe/extractor/stream/VideoStream.java"
 )
 
 # $1 = path, $2 = label, $3 = tracked branch
