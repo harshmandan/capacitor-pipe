@@ -11,8 +11,8 @@ differs, why, and what to re-check when you bump that dependency.
 divergence, add a row here — a silent one is the failure mode this file exists
 to prevent.
 
-Verified against PipePipeExtractor `8d2799a` and NewPipeExtractor `v0.26.5`
-(2026-08-17).
+Verified against PipePipeExtractor `4835a08` (v5.4.0, 2026-10-14) and
+NewPipeExtractor `v0.26.5` (2026-08-17).
 
 ---
 
@@ -243,10 +243,10 @@ the install in `PipePipeEngine` breaks — the checker asserts both.
 The largest behavioural split. PipePipe **implements** SABR; NewPipe
 deliberately **avoids** it.
 
-| | PipePipe `8d2799a` | NewPipe `v0.26.5` |
+| | PipePipe `4835a08` | NewPipe `v0.26.5` |
 |---|---|---|
 | `DeliveryMethod.SABR` | yes | no |
-| SABR classes | 21 | 0 |
+| SABR classes | 23 | 0 |
 | Landed via | PR #69, 2026-06-24, +8611 lines | — |
 | Upstream stance | — | PR #1508 *"Workaround SABR enforcement by using another player client"* |
 | Tracking | — | `TeamNewPipe/NewPipe#12248`, open, "help wanted" |
@@ -254,6 +254,15 @@ deliberately **avoids** it.
 - `engine/PipePipeEngine.kt` — computes `requiresSabr`
 - `engine/NewPipeEngine.kt` — hardcoded `false`, because this fork
   cannot produce SABR streams at all
+
+**Server-requested reload is not handled (PipePipe v5.4.0+).** Upstream added
+`SabrInfoReloader`: the session reloads its player info mid-stream only if one
+is installed with `session.setInfoReloader(...)`. `PipeSabrManager` installs
+none, so a reload request still ends the session, now as `SabrReloadException`
+(a `SabrProtocolException`). That is no worse than before. To adopt it, the
+upstream hook is `YoutubeStreamExtractor::fetchSabrInfoForReload`, but it reads
+the global localization and PO-token resolver and runs inside the synchronized
+`requestOnce`, so it needs the same locking care as §9.
 
 **What NewPipe did instead (PR #1508, merged 2026-06-09, in our pin).** YouTube
 began *enforcing* SABR on the InnerTube client NewPipe used. Rather than
