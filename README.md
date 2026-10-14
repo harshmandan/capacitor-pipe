@@ -203,7 +203,7 @@ them, so anything distributing it inherits GPL-3.0.
 ### extractStreamInfo(...)
 
 ```typescript
-extractStreamInfo(options: ExtractStreamInfoOptions) => any
+extractStreamInfo(options: ExtractStreamInfoOptions) => Promise<StreamInfoResult>
 ```
 
 Extract stream information for a YouTube URL.
@@ -216,7 +216,7 @@ even when the call ultimately succeeds.
 | ------------- | ----------------------------------------------------------------------------- |
 | **`options`** | <code><a href="#extractstreaminfooptions">ExtractStreamInfoOptions</a></code> |
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;<a href="#streaminforesult">StreamInfoResult</a>&gt;</code>
 
 --------------------
 
@@ -224,7 +224,7 @@ even when the call ultimately succeeds.
 ### openSabrSession(...)
 
 ```typescript
-openSabrSession(options: OpenSabrSessionOptions) => any
+openSabrSession(options: OpenSabrSessionOptions) => Promise<SabrSessionResult>
 ```
 
 Open a SABR playback session.
@@ -242,7 +242,7 @@ token this call fails.
 | ------------- | ------------------------------------------------------------------------- |
 | **`options`** | <code><a href="#opensabrsessionoptions">OpenSabrSessionOptions</a></code> |
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;<a href="#sabrsessionresult">SabrSessionResult</a>&gt;</code>
 
 --------------------
 
@@ -250,7 +250,7 @@ token this call fails.
 ### closeSabrSession(...)
 
 ```typescript
-closeSabrSession(options: { sessionId: string; }) => any
+closeSabrSession(options: { sessionId: string; }) => Promise<void>
 ```
 
 Tear down a SABR session and release its cache, tokens and loopback routes.
@@ -259,15 +259,13 @@ Tear down a SABR session and release its cache, tokens and loopback routes.
 | ------------- | ----------------------------------- |
 | **`options`** | <code>{ sessionId: string; }</code> |
 
-**Returns:** <code>any</code>
-
 --------------------
 
 
 ### providePoToken(...)
 
 ```typescript
-providePoToken(options: PoTokenOptions) => any
+providePoToken(options: PoTokenOptions) => Promise<void>
 ```
 
 Supply a Proof-of-Origin token for a video, before opening its SABR session.
@@ -289,36 +287,23 @@ unattested session.
 | ------------- | --------------------------------------------------------- |
 | **`options`** | <code><a href="#potokenoptions">PoTokenOptions</a></code> |
 
-**Returns:** <code>any</code>
-
 --------------------
 
 
 ### getEngineStatus()
 
 ```typescript
-getEngineStatus() => any
+getEngineStatus() => Promise<EngineStatus>
 ```
 
 Report which engines and playback paths are available at runtime.
 
-**Returns:** <code>any</code>
+**Returns:** <code>Promise&lt;<a href="#enginestatus">EngineStatus</a>&gt;</code>
 
 --------------------
 
 
 ### Interfaces
-
-
-#### ExtractStreamInfoOptions
-
-| Prop                 | Type                 | Description                                                                                 |
-| -------------------- | -------------------- | ------------------------------------------------------------------------------------------- |
-| **`videoUrl`**       | <code>string</code>  |                                                                                             |
-| **`engines`**        | <code>{}</code>      | Restrict extraction to these engines, in this order. Defaults to `['pipepipe', 'newpipe']`. |
-| **`sponsorBlock`**   | <code>boolean</code> | Fetch SponsorBlock segments. Best-effort; never blocks extraction. Default false.           |
-| **`localization`**   | <code>string</code>  | BCP-47 localisation, e.g. `en-GB`. Affects what YouTube returns, not just formatting.       |
-| **`contentCountry`** | <code>string</code>  | ISO-3166 country code. Affects availability and recommendations.                            |
 
 
 #### StreamInfoResult
@@ -328,7 +313,7 @@ Report which engines and playback paths are available at runtime.
 | **`success`**    | <code>boolean</code>                                          |                                                                         |
 | **`error`**      | <code>string</code>                                           |                                                                         |
 | **`engine`**     | <code><a href="#extractionengine">ExtractionEngine</a></code> | The engine that produced `streamInfo`. Absent when every engine failed. |
-| **`attempts`**   | <code>{}</code>                                               | Every engine tried, in order, including the ones that failed.           |
+| **`attempts`**   | <code>EngineAttempt[]</code>                                  | Every engine tried, in order, including the ones that failed.           |
 | **`streamInfo`** | <code><a href="#streaminfo">StreamInfo</a></code>             |                                                                         |
 
 
@@ -367,14 +352,14 @@ One engine's attempt at an extraction, successful or not.
 | **`textualUploadDate`**       | <code>string</code>                               |                                                                                                                                                 |
 | **`uploadDate`**              | <code>string</code>                               | ISO-8601 upload timestamp.                                                                                                                      |
 | **`category`**                | <code>string</code>                               |                                                                                                                                                 |
-| **`tags`**                    | <code>{}</code>                                   |                                                                                                                                                 |
+| **`tags`**                    | <code>string[]</code>                             |                                                                                                                                                 |
 | **`thumbnailUrl`**            | <code>string</code>                               | Highest-resolution thumbnail, kept for convenience.                                                                                             |
-| **`thumbnails`**              | <code>{}</code>                                   |                                                                                                                                                 |
-| **`videoStreams`**            | <code>{}</code>                                   |                                                                                                                                                 |
-| **`audioStreams`**            | <code>{}</code>                                   |                                                                                                                                                 |
-| **`videoOnlyStreams`**        | <code>{}</code>                                   |                                                                                                                                                 |
-| **`subtitles`**               | <code>{}</code>                                   |                                                                                                                                                 |
-| **`sponsorBlockSegments`**    | <code>{}</code>                                   |                                                                                                                                                 |
+| **`thumbnails`**              | <code>Thumbnail[]</code>                          |                                                                                                                                                 |
+| **`videoStreams`**            | <code>VideoStream[]</code>                        |                                                                                                                                                 |
+| **`audioStreams`**            | <code>AudioStream[]</code>                        |                                                                                                                                                 |
+| **`videoOnlyStreams`**        | <code>VideoStream[]</code>                        |                                                                                                                                                 |
+| **`subtitles`**               | <code>SubtitleStream[]</code>                     |                                                                                                                                                 |
+| **`sponsorBlockSegments`**    | <code>SponsorBlockSegment[]</code>                |                                                                                                                                                 |
 | **`requiresSabr`**            | <code>boolean</code>                              | True when YouTube served this video only over SABR, meaning the stream arrays contain no directly playable URL. Open a SABR session to play it. |
 
 
@@ -427,27 +412,29 @@ One engine's attempt at an extraction, successful or not.
 | **`endTimeMs`**   | <code>number</code>                                                   |                                                       |
 
 
-#### OpenSabrSessionOptions
+#### ExtractStreamInfoOptions
 
-| Prop                  | Type                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| --------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`videoUrl`**        | <code>string</code> |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| **`startPositionMs`** | <code>number</code> | Start position in milliseconds. The session preloads around this point, so setting it avoids a wasted seek on resume. Default 0.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| **`maxHeight`**       | <code>number</code> | The tallest video format to open on, in pixels — 720 for 720p. **This is the quality the video will play at, not a ceiling it adapts under.** SABR selects one format when the session opens and serves only that one, and the manifest advertises only what the session can serve, so there is nothing for a player to adapt between. Omitted means the tallest format available, which on a 4K source is 2160p onto whatever handset asked — a real cost in decode and in data. Any host with an opinion about quality should state it. When every format is taller than the cap the shortest one is used, so a 1080p-only video asked for 720p plays at 1080p rather than failing. |
+| Prop                 | Type                            | Description                                                                                 |
+| -------------------- | ------------------------------- | ------------------------------------------------------------------------------------------- |
+| **`videoUrl`**       | <code>string</code>             |                                                                                             |
+| **`engines`**        | <code>ExtractionEngine[]</code> | Restrict extraction to these engines, in this order. Defaults to `['pipepipe', 'newpipe']`. |
+| **`sponsorBlock`**   | <code>boolean</code>            | Fetch SponsorBlock segments. Best-effort; never blocks extraction. Default false.           |
+| **`localization`**   | <code>string</code>             | BCP-47 localisation, e.g. `en-GB`. Affects what YouTube returns, not just formatting.       |
+| **`contentCountry`** | <code>string</code>             | ISO-3166 country code. Affects availability and recommendations.                            |
 
 
 #### SabrSessionResult
 
-| Prop                          | Type                 | Description                                                                                                                                                                                                                             |
-| ----------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`success`**                 | <code>boolean</code> |                                                                                                                                                                                                                                         |
-| **`error`**                   | <code>string</code>  |                                                                                                                                                                                                                                         |
-| **`sessionId`**               | <code>string</code>  | Handle for {@link PipePlugin.closeSabrSession} and for native player lookup.                                                                                                                                                            |
-| **`manifestUrl`**             | <code>string</code>  | A DASH manifest served on loopback, e.g. `http://127.0.0.1:52731/&lt;sessionId&gt;/manifest.mpd`. Playable by any web player (dash.js, Shaka) and by Media3's `DashMediaSource`. This is the portable path — it needs no native wiring. |
-| **`nativePlaybackAvailable`** | <code>boolean</code> | True when Media3 is on the app's classpath, meaning native code can build a zero-copy MediaSource with `PipeSabr.mediaSourceFactory(sessionId)` instead of going over loopback.                                                         |
-| **`formats`**                 | <code>{}</code>      |                                                                                                                                                                                                                                         |
-| **`isLive`**                  | <code>boolean</code> |                                                                                                                                                                                                                                         |
-| **`durationMs`**              | <code>number</code>  |                                                                                                                                                                                                                                         |
+| Prop                          | Type                      | Description                                                                                                                                                                                                                             |
+| ----------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`success`**                 | <code>boolean</code>      |                                                                                                                                                                                                                                         |
+| **`error`**                   | <code>string</code>       |                                                                                                                                                                                                                                         |
+| **`sessionId`**               | <code>string</code>       | Handle for {@link PipePlugin.closeSabrSession} and for native player lookup.                                                                                                                                                            |
+| **`manifestUrl`**             | <code>string</code>       | A DASH manifest served on loopback, e.g. `http://127.0.0.1:52731/&lt;sessionId&gt;/manifest.mpd`. Playable by any web player (dash.js, Shaka) and by Media3's `DashMediaSource`. This is the portable path — it needs no native wiring. |
+| **`nativePlaybackAvailable`** | <code>boolean</code>      | True when Media3 is on the app's classpath, meaning native code can build a zero-copy MediaSource with `PipeSabr.mediaSourceFactory(sessionId)` instead of going over loopback.                                                         |
+| **`formats`**                 | <code>SabrFormat[]</code> |                                                                                                                                                                                                                                         |
+| **`isLive`**                  | <code>boolean</code>      |                                                                                                                                                                                                                                         |
+| **`durationMs`**              | <code>number</code>       |                                                                                                                                                                                                                                         |
 
 
 #### SabrFormat
@@ -466,6 +453,15 @@ A format offered by a SABR session.
 | **`approxDurationMs`** | <code>number</code>             |
 
 
+#### OpenSabrSessionOptions
+
+| Prop                  | Type                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| --------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`videoUrl`**        | <code>string</code> |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **`startPositionMs`** | <code>number</code> | Start position in milliseconds. The session preloads around this point, so setting it avoids a wasted seek on resume. Default 0.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **`maxHeight`**       | <code>number</code> | The tallest video format to open on, in pixels — 720 for 720p. **This is the quality the video will play at, not a ceiling it adapts under.** SABR selects one format when the session opens and serves only that one, and the manifest advertises only what the session can serve, so there is nothing for a player to adapt between. Omitted means the tallest format available, which on a 4K source is 2160p onto whatever handset asked — a real cost in decode and in data. Any host with an opinion about quality should state it. When every format is taller than the cap the shortest one is used, so a 1080p-only video asked for 720p plays at 1080p rather than failing. |
+
+
 #### PoTokenOptions
 
 | Prop                | Type                | Description                                                                                                                               |
@@ -481,12 +477,12 @@ A format offered by a SABR session.
 
 Availability of each engine and of the optional native playback path.
 
-| Prop                  | Type                 | Description                                                                |
-| --------------------- | -------------------- | -------------------------------------------------------------------------- |
-| **`available`**       | <code>{}</code>      | Engines present on the classpath, in fallback order.                       |
-| **`pipePipeVersion`** | <code>string</code>  |                                                                            |
-| **`newPipeVersion`**  | <code>string</code>  |                                                                            |
-| **`media3Available`** | <code>boolean</code> | True when androidx.media3 was found, enabling the native MediaSource path. |
+| Prop                  | Type                            | Description                                                                |
+| --------------------- | ------------------------------- | -------------------------------------------------------------------------- |
+| **`available`**       | <code>ExtractionEngine[]</code> | Engines present on the classpath, in fallback order.                       |
+| **`pipePipeVersion`** | <code>string</code>             |                                                                            |
+| **`newPipeVersion`**  | <code>string</code>             |                                                                            |
+| **`media3Available`** | <code>boolean</code>            | True when androidx.media3 was found, enabling the native MediaSource path. |
 
 
 ### Type Aliases

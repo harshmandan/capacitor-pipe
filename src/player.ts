@@ -10,6 +10,8 @@
  * implementation can be dropped in behind it later without moving call sites.
  */
 
+import type { PluginListenerHandle } from '@capacitor/core';
+
 /** A rect in CSS pixels, as measured by the host's layout. */
 export interface DockRect {
   x: number;
@@ -486,10 +488,7 @@ export interface PipePlayerPlugin {
    * Quality and speed are surfaced rather than implemented, because the
    * player has no opinion about your quality list or your speed menu.
    */
-  addListener(
-    eventName: 'playerAction',
-    listener: (event: PlayerActionEvent) => void,
-  ): Promise<import('@capacitor/core').PluginListenerHandle>;
+  addListener(eventName: 'playerAction', listener: (event: PlayerActionEvent) => void): Promise<PluginListenerHandle>;
 
   /**
    * Follow playback position.
@@ -499,8 +498,5 @@ export interface PipePlayerPlugin {
    * completion. Roughly one event a second while playing and none at all while
    * paused, so it can be written straight to a record.
    */
-  addListener(
-    eventName: 'playerPosition',
-    listener: (event: PlayerPosition) => void,
-  ): Promise<import('@capacitor/core').PluginListenerHandle>;
+  addListener(eventName: 'playerPosition', listener: (event: PlayerPosition) => void): Promise<PluginListenerHandle>;
 }

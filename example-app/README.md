@@ -5,8 +5,10 @@ and comes with a very minimal shell for building an app.
 
 ### Running this example
 
-To run the provided example, you can use `npm start` command.
+Install from inside this folder — it is a bun workspace that links the plugin
+from `..` (see Gotcha 13 in the root CLAUDE.md).
 
 ```bash
-npm start
+bun install
+bun run start
 ```

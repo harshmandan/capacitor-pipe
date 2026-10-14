@@ -109,7 +109,7 @@ verify_api() {
 PP="submodules/PipePipeExtractor"
 NP="submodules/NewPipeExtractor"
 
-[ -f "$PP/settings.gradle" ] || die "Submodules not initialised. Run: npm run extractors:init"
+[ -f "$PP/settings.gradle" ] || die "Submodules not initialised. Run: bun run extractors:init"
 
 if [ "$CHECK_ONLY" -eq 1 ]; then
     [ "$ONLY" = "newpipe" ] || show_incoming "$PP" "PipePipeExtractor" main || true

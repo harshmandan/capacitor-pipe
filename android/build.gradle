@@ -129,7 +129,7 @@ configurations.configureEach {
 dependencies {
     /*
      * Both extraction engines, built from the pinned submodules by
-     * `npm run extractors:build`:
+     * `bun run extractors:build`:
      *
      *   pipepipe-extractor.jar        primary, org.schabi.newpipe.extractor.*
      *   pipepipe-timeago-parser.jar   its sibling module

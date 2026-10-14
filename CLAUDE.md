@@ -51,16 +51,18 @@ yourself wanting to change extractor source, wrap it on our side instead.
 ## Build
 
 ```bash
-npm run extractors:init      # git submodule update --init --recursive
-npm run extractors:build     # build both extractors -> android/libs/*.jar
-npm run build                # TypeScript + docgen
-npm run verify:android       # compile the Android module
+bun install                  # bun is the package manager, script runner and test runner
+bun run extractors:init      # git submodule update --init --recursive
+bun run extractors:build     # build both extractors -> android/libs/*.jar
+bun run build                # TypeScript + docgen
+bun run test                 # type-check the tests, then bun test
+bun run verify:android       # compile the Android module
 ```
 
 `android/libs/*.jar` is generated but **committed and published** — npm tarballs
 cannot carry git submodules, so a consuming app never sees `submodules/`. The
 submodules are the development path; `android/libs/` is the published path.
-Regenerate with `npm run extractors:build`, never by hand.
+Regenerate with `bun run extractors:build`, never by hand.
 
 ## Updating the extractors
 
@@ -91,7 +93,7 @@ submodules' source (39 checks), and `update-extractors.sh` runs it before
 rebuilding, rolling the pins back if anything changed.
 
 ```bash
-npm run extractors:check     # assert the recorded divergences still hold
+bun run extractors:check     # assert the recorded divergences still hold
 ```
 
 **Whenever you write code that treats the two engines differently, add it to
@@ -356,7 +358,17 @@ distinctive name.
 to the app until `pnpm install` ran again — builds succeeded and the APK simply
 contained old code. Diagnosing a fixed bug that "won't go away" starts here.
 
-Now `"link:.."`, which symlinks the working tree. Verify with:
+Under bun, neither obvious fix works. `file:..` does worse than copy: it nests
+the repo inside itself (`example-app/node_modules/capacitor-pipe/example-app/...`)
+until paths overflow. `link:` takes only a name registered globally by
+`bun link`, never a path — and that global entry points at whichever checkout
+ran `bun link` last, so with two worktrees the app silently builds the other
+one's plugin.
+
+So the example app is a bun **workspace root** with the plugin as its member:
+`"workspaces": [".."]` and `"capacitor-pipe": "workspace:*"`. bun symlinks
+workspace members to their source, relatively, so each checkout links to
+itself. Run `bun install` inside `example-app/`. Verify with:
 
 ```bash
 ls -la example-app/node_modules | grep capacitor-pipe   # -> ../..
@@ -690,7 +702,7 @@ Sessions hold a segment cache and a WebView-minted token. They must be closed.
 
 - Android-only. The web implementation is a stub that reports unavailability —
   extraction cannot run in a browser (CORS, and SABR needs a WebView for BotGuard).
-- `src/definitions.ts` is the source of truth for the API; run `npm run docgen`
+- `src/definitions.ts` is the source of truth for the API; run `bun run docgen`
   after changing it, which rewrites the README API section.
 - Prefer surfacing structured failure (`attempts`, `errorType`) over throwing.
   Callers need to distinguish "age-restricted" from "both engines are broken".

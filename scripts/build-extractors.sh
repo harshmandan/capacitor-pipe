@@ -23,8 +23,8 @@ INIT="$ROOT/tools/force-java17.init.gradle"
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31mError:\033[0m %s\n' "$*" >&2; exit 1; }
 
-[ -f "$PPE/settings.gradle" ] || die "PipePipeExtractor submodule is empty. Run: npm run extractors:init"
-[ -f "$NPE/settings.gradle.kts" ] || die "NewPipeExtractor submodule is empty. Run: npm run extractors:init"
+[ -f "$PPE/settings.gradle" ] || die "PipePipeExtractor submodule is empty. Run: bun run extractors:init"
+[ -f "$NPE/settings.gradle.kts" ] || die "NewPipeExtractor submodule is empty. Run: bun run extractors:init"
 
 mkdir -p "$LIBS"
 

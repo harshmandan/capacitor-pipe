@@ -27,8 +27,8 @@ changed() { printf '  \033[31mCHANGED\033[0m  §%-3s %s\n' "$1" "$2"; changed=$(
 note()    { printf '           %s\n' "$1"; }
 head2()   { printf '\n\033[1m%s\033[0m\n' "$1"; }
 
-[ -d "$PP" ] || { echo "PipePipeExtractor submodule missing. Run: npm run extractors:init" >&2; exit 1; }
-[ -d "$NP" ] || { echo "NewPipeExtractor submodule missing. Run: npm run extractors:init" >&2; exit 1; }
+[ -d "$PP" ] || { echo "PipePipeExtractor submodule missing. Run: bun run extractors:init" >&2; exit 1; }
+[ -d "$NP" ] || { echo "NewPipeExtractor submodule missing. Run: bun run extractors:init" >&2; exit 1; }
 
 # assert_grep <section> <expect:yes|no> <file> <pattern> <description>
 assert_grep() {
