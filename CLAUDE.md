@@ -307,6 +307,12 @@ cleartext from API 28. Without an exemption the failure is
 network security policy` — which reads like a bug in the server rather than a
 policy problem.
 
+A web player in the WebView hits the same policy with a different message:
+`fetch` rejects with a bare `TypeError: Failed to fetch`, and only the devtools
+Network panel shows `net::ERR_CLEARTEXT_NOT_PERMITTED`. The example app had
+exactly this until 2026-10-14. Native SABR tests passed while its WebView could
+not reach the server at all.
+
 The library ships `res/xml/pipe_network_security_config.xml` allowing cleartext
 to loopback only. Most Capacitor apps already permit localhost, since Capacitor
 serves its own assets locally; apps that do not must point
