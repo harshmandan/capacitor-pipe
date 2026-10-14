@@ -98,10 +98,22 @@ whatever handset asked:
 const session = await Pipe.openSabrSession({ videoUrl, maxHeight: 720 });
 ```
 
-To change quality, close the session and open another with a different cap,
-passing the current position as `startPositionMs` so playback resumes where it
-was. When every format is taller than the cap the shortest is used, so a
-1080p-only video asked for 720p plays rather than failing.
+To change quality, open another session with a different cap at the current
+position, load it, and only then close the old one — the player is still
+reading the old session until the new one is loaded. With the native player,
+`switchSabrQuality` does exactly that:
+
+```ts
+const next = await switchSabrQuality({ sessionId: session.sessionId!, videoUrl, maxHeight: 480 });
+// next.sessionId is now the one to close when playback ends.
+```
+
+Pass the same `videoUrl` as the first open. A reopen of the same URL within 20
+minutes (sooner if the streaming URL expires first) reuses the earlier
+extraction instead of repeating it, which is most of what a switch waits for;
+if the reused one turns out stale, the open quietly extracts again. When every
+format is taller than the cap the shortest is used, so a 1080p-only video asked
+for 720p plays rather than failing.
 
 Two things followed from getting this wrong once, and both are worth knowing.
 The manifest used to advertise every format the extraction knew about — 6 video

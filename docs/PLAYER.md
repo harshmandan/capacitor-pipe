@@ -219,6 +219,11 @@ Just another `load()` with `startPositionMs` set to the current position. The
 position goes into `setMediaItem`/`setMediaSource` rather than a `seekTo` after
 `prepare()`, so there is no flash of frame zero.
 
+For a SABR quality switch that means a second session, because a session
+serves one quality. `switchSabrQuality({ sessionId, videoUrl, maxHeight })`
+opens it, loads it at the current position, resumes playback if it was
+playing, and closes the old session last. Keep the `sessionId` it resolves.
+
 `getPlayerStatus().playingOffline` reports which kind of media is loaded. It is
 reported, not rendered — the host still owns every piece of chrome text.
 
