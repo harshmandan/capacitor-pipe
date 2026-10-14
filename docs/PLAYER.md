@@ -646,7 +646,7 @@ not need this — the system enters PiP on its own.
 ### addListener('playerAction', ...)
 
 ```typescript
-addListener(eventName: 'playerAction', listener: (event: PlayerActionEvent) => void) => Promise<import('@capacitor/core').PluginListenerHandle>
+addListener(eventName: 'playerAction', listener: (event: PlayerActionEvent) => void) => Promise<PluginListenerHandle>
 ```
 
 Controls the host owns rather than the player.
@@ -659,7 +659,7 @@ player has no opinion about your quality list or your speed menu.
 | **`eventName`** | <code>'playerAction'</code>                                                         |
 | **`listener`**  | <code>(event: <a href="#playeractionevent">PlayerActionEvent</a>) =&gt; void</code> |
 
-**Returns:** <code>Promise&lt;PluginListenerHandle&gt;</code>
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 --------------------
 
@@ -667,7 +667,7 @@ player has no opinion about your quality list or your speed menu.
 ### addListener('playerPosition', ...)
 
 ```typescript
-addListener(eventName: 'playerPosition', listener: (event: PlayerPosition) => void) => Promise<import('@capacitor/core').PluginListenerHandle>
+addListener(eventName: 'playerPosition', listener: (event: PlayerPosition) => void) => Promise<PluginListenerHandle>
 ```
 
 Follow playback position.
@@ -682,7 +682,7 @@ paused, so it can be written straight to a record.
 | **`eventName`** | <code>'playerPosition'</code>                                                 |
 | **`listener`**  | <code>(event: <a href="#playerposition">PlayerPosition</a>) =&gt; void</code> |
 
-**Returns:** <code>Promise&lt;PluginListenerHandle&gt;</code>
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
 --------------------
 
@@ -827,6 +827,13 @@ built-ins — with your glyph inside, so additions cannot look bolted on.
 | ---------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **`id`**   | <code>string</code> | Returned in the `playerAction` event when tapped.                                                                                                                                                            |
 | **`icon`** | <code>string</code> | SVG path data on a 24x24 viewBox, e.g. `'M8 5v14l11-7z'`. A path rather than an image so the icon crosses the bridge as plain data and renders in our style at any density — no asset packaging, no bitmaps. |
+
+
+#### PluginListenerHandle
+
+| Prop         | Type                                      |
+| ------------ | ----------------------------------------- |
+| **`remove`** | <code>() =&gt; Promise&lt;void&gt;</code> |
 
 
 #### PlayerActionEvent
