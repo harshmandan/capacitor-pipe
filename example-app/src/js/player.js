@@ -1,4 +1,4 @@
-import { PipePlayer } from 'capacitor-pipe';
+import { Pipe, PipePlayer, switchSabrQuality } from 'capacitor-pipe';
 
 // A plain progressive MP4. Phase 1 deliberately avoids the extractor: the risk
 // being tested is native-over-WebView compositing, and mixing extraction in
@@ -90,7 +90,46 @@ PipePlayer.addListener('playerAction', (event) => {
   if (event.action === 'expandUnavailable') {
     log('expandUnavailable', 'route back to the watch page here, then dock()');
   }
+
+  // A SABR session serves one quality, so a pick reopens it at the new height.
+  if (event.action === 'qualitySelected' && sabrSessionId) {
+    run('quality', () => switchTo(event.buttonId))();
+  }
 });
+
+// switchSabrQuality loads the new session before closing the old one, so
+// playback carries on from where it was.
+const switchTo = async (label) => {
+  const maxHeight = parseInt(label, 10);
+  const next = await switchSabrQuality({ sessionId: sabrSessionId, videoUrl: SABR_VIDEO, maxHeight });
+  if (!next.success) throw new Error(next.error);
+  sabrSessionId = next.sessionId;
+  await PipePlayer.configure({ qualityLabel: label });
+  return { sessionId: next.sessionId, maxHeight };
+};
+
+// The extractor's SABR path end to end: a session played through its bridge.
+const SABR_VIDEO = 'https://www.youtube.com/watch?v=iUtnZpzkbG8';
+let sabrSessionId = null;
+
+document.getElementById('sabr').onclick = run('sabr', async () => {
+  await PipePlayer.configure({
+    title: 'SABR sample',
+    subtitle: 'YouTube, one quality per session',
+    qualities: ['1080p', '720p', '480p', '360p'],
+    qualityLabel: '720p',
+  });
+  const opened = await Pipe.openSabrSession({ videoUrl: SABR_VIDEO, maxHeight: 720 });
+  if (!opened.success) throw new Error(opened.error);
+  await PipePlayer.load({ sessionId: opened.sessionId });
+  // Close the previous session only once the new one is loaded.
+  if (sabrSessionId) await Pipe.closeSabrSession({ sessionId: sabrSessionId });
+  sabrSessionId = opened.sessionId;
+  return { sessionId: opened.sessionId };
+});
+
+// The same switch from host UI, for hosts that keep their quality menu outside the player.
+document.getElementById('sabr360').onclick = run('switch', () => switchTo('360p'));
 document.getElementById('play').onclick = run('play', () => PipePlayer.play());
 document.getElementById('pause').onclick = run('pause', () => PipePlayer.pause());
 document.getElementById('release').onclick = run('release', () => PipePlayer.release());
