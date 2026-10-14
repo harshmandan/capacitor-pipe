@@ -87,7 +87,11 @@ show_incoming() {
 
     # A build-file change can move the toolchain or add a dependency our
     # android/build.gradle does not declare yet.
-    if git -C "$path" diff --name-only "$cur..$new" | grep -qE '(^|/)(build\.gradle(\.kts)?|libs\.versions\.toml|settings\.gradle(\.kts)?)$'; then
+    # Capture first: `git diff | grep -q` SIGPIPEs git on a long diff, and
+    # pipefail turns that match into a miss (see build-extractors.sh).
+    local changed
+    changed="$(git -C "$path" diff --name-only "$cur..$new")"
+    if printf '%s\n' "$changed" | grep -E '(^|/)(build\.gradle(\.kts)?|libs\.versions\.toml|settings\.gradle(\.kts)?)$' >/dev/null; then
         warn "$label build files changed — re-check dependencies and toolchain in android/build.gradle"
         git -C "$path" diff "$cur..$new" -- '*build.gradle*' '*libs.versions.toml' | head -60 | sed 's/^/      /'
     fi
