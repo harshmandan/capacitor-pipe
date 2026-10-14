@@ -25,7 +25,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
  * `tools/shade/build.gradle`.
  *
  * Deliberately narrower than [PipePipeEngine]: no SABR (this fork has
- * no `DeliveryMethod.SABR`), no SponsorBlock, and no restored dislikes.
+ * no `DeliveryMethod.SABR`) and no SponsorBlock.
  * Its value is that it deciphers signatures locally in Rhino instead of calling
  * a remote service, so it survives outages that take the primary down.
  */

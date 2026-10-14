@@ -111,6 +111,10 @@ assert_grep 6 yes "$PP/stream/StreamInfo.java" \
 assert_grep 6 no  "$NP/stream/StreamInfo.java" \
     'String getUploaderAvatarUrl\(\)' "NewPipe still lacks it"
 
+head2 "6a. dislikeCount"
+assert_grep 6a yes "$PP/StreamingService.java" \
+    'boolean fetchDislike = false' "PipePipe still leaves ReturnYouTubeDislike off by default"
+
 head2 "7. SponsorBlock"
 assert_grep 7 yes "$PP/stream/StreamInfo.java" \
     'getSponsorBlockSegments' "PipePipe still exposes SponsorBlock segments"

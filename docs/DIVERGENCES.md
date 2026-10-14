@@ -173,16 +173,20 @@ acceptable, but do not treat `thumbnailUrl` as engine-stable.
 in PipePipe and `Locale` in NewPipe. We do not surface it today — if you start
 mapping it, it needs a per-engine branch.
 
-### 6a. `dislikeCount` (observed live, not compile-visible)
+### 6a. `dislikeCount` (converged at `-1`; asserted)
 
-Same video, same run: PipePipe returned `89`, NewPipe returned `-1` (its
-"unknown" sentinel). PipePipe restores dislikes via ReturnYouTubeDislike as a
-best-effort side call; NewPipe does not.
+Both engines now return `-1`, the "unknown" sentinel. Until PipePipe v5.4.0
+they differed: on `iUtnZpzkbG8` (2026-08-17) PipePipe returned `89` and NewPipe
+`-1`, because PipePipe fetched dislikes from ReturnYouTubeDislike as a side
+call. Upstream `0dfb2d88` turned that off by default
+(`StreamingService.fetchDislike = false`). We never call `setFetchDislike`, and
+we chose to leave it off: it is a request to a third party on every extraction.
 
-Observed on `iUtnZpzkbG8`, 2026-08-17.
-
-**Consequence:** `dislikeCount` is engine-dependent and `-1` means "unknown",
-not "zero". Check `result.engine` before showing it.
+**Re-check on a PipePipe bump:** `check-divergences.sh` asserts the default is
+still `false`. If upstream turns it back on, every extraction quietly starts
+calling ReturnYouTubeDislike again and the engines diverge again. If you ever
+opt in, do it per call under `CLIENT_LOCK`, the way SponsorBlock (§7) is
+installed and cleared.
 
 ### 6b. `description` content format (observed live, not compile-visible)
 

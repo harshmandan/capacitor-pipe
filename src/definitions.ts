@@ -131,7 +131,11 @@ export interface StreamInfo {
 
   viewCount: number;
   likeCount?: number;
-  /** Restored via ReturnYouTubeDislike where the engine supports it. */
+  /**
+   * `-1` means unknown, and today it is always `-1`. PipePipe can fetch it from
+   * ReturnYouTubeDislike, a third-party service, but upstream turned that off by
+   * default in v5.4.0 and this plugin leaves it off. NewPipe never fetches it.
+   */
   dislikeCount?: number;
 
   description?: string;

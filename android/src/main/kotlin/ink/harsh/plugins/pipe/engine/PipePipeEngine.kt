@@ -27,8 +27,8 @@ import java.util.function.Function
  * Primary engine: PipePipeExtractor, on the unrelocated
  * `org.schabi.newpipe.extractor` namespace.
  *
- * Supports SABR, SponsorBlock and restored dislike counts, none of which the
- * NewPipe fallback provides. Its YouTube path defers signature and
+ * Supports SABR and SponsorBlock, neither of which the NewPipe fallback
+ * provides. Its YouTube path defers signature and
  * `n`-parameter deciphering to a PipePipe-hosted service, so it fails in
  * different circumstances than NewPipe — which is what makes the fallback
  * meaningful rather than redundant.
