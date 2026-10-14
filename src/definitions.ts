@@ -211,9 +211,10 @@ export interface OpenSabrSessionOptions {
    * The tallest video format to open on, in pixels — 720 for 720p.
    *
    * **This is the quality the video will play at, not a ceiling it adapts
-   * under.** SABR selects one format when the session opens and serves only
+   * under.** The session selects one format when it opens and serves only
    * that one, and the manifest advertises only what the session can serve, so
-   * there is nothing for a player to adapt between.
+   * there is nothing for a player to adapt between. That is this library's
+   * limit, not SABR's; to change quality, reopen at the current position.
    *
    * Omitted means the tallest format available, which on a 4K source is 2160p
    * onto whatever handset asked — a real cost in decode and in data. Any host

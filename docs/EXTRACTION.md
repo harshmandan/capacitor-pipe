@@ -221,6 +221,16 @@ to switch formats mid-stream (PipePipeClient does this with a pending-segment
 exception and a retry policy — see `reference/PipePipeClient`,
 `SabrLoadErrorHandlingPolicy`). So:
 
+> **Corrected 2026-10-14.** The parenthesis above is wrong. PipePipeClient
+> (dev `7fbda5e`) does not switch SABR formats mid-stream: its manifest holds
+> `Collections.singletonList(preferredVideo)`, and its quality menu saves the
+> position, rebuilds the media source and opens a new session — the same model
+> as ours. `SabrSegmentPendingException` with `SabrLoadErrorHandlingPolicy`
+> handles audio and video asking at the same moment (one waits, retried every
+> 100 ms), not format changes. The limit is also ours, not the protocol's:
+> every `YoutubeSabrRequest.playback(...)` names its video track, so one session
+> could change format between requests. Nobody upstream has built that.
+
 - the bootstrap choice **is** the playback quality, not a starting guess;
 - `openSabrSession({ maxHeight })` is therefore the quality control;
 - and a manifest must never advertise more than the session can serve.
