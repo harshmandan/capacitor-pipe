@@ -10,14 +10,15 @@ import ink.harsh.plugins.pipe.engine.PipePipeEngine
 import java.util.LinkedHashMap
 
 /** Runs the engine chain and reports what each engine did. */
-class PipeExtractor {
+class PipeExtractor internal constructor(chain: List<ExtractionEngine>) {
+
+    // Insertion order is the fallback order.
+    constructor() : this(listOf(PipePipeEngine(), NewPipeEngine()))
 
     private val engines: MutableMap<String, ExtractionEngine> = LinkedHashMap()
 
     init {
-        // Insertion order is the fallback order.
-        register(PipePipeEngine())
-        register(NewPipeEngine())
+        chain.forEach(::register)
     }
 
     private fun register(engine: ExtractionEngine) {
