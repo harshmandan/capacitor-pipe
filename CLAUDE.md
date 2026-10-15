@@ -636,6 +636,23 @@ seek that reloads and lands at 0:00", diagnosed as everything except a parse
 bug first. `getInt`, `getFloat` and `getDouble` do convert; `getLong` alone
 does not. Read longs as `(call.data.opt(name) as? Number)?.toLong()`.
 
+### 29. A tap on hidden controls only reveals them — which reads as dead buttons
+
+While playing, the controls hide themselves 3.5 s after they appear
+(`PipePlayerSurface`, the `controlsVisible` effect), and a tap on the video
+while they are hidden shows them instead of pressing anything under it. That is
+the intended YouTube behaviour, and it makes a slow test look like broken
+buttons: drive the player with `adb shell input tap`, look at a screenshot,
+tap the quality chip ten seconds later — the controls are back on screen, no
+sheet opened, and the next tap does the same. It was filed as "the speed and
+quality chips do not take taps" and took a debugging round to clear.
+
+Tap a control within 3.5 s of revealing it, or pause first (a paused player
+does not auto-hide). And do not take uiautomator's `clickable="false"` on the
+speed and quality chips as evidence: it reports that while the chips work.
+What settled it was a pointer probe showing the tap reaching the chip and its
+`onClick` firing — the Gotcha 22 lesson again.
+
 ---
 
 # Architecture
