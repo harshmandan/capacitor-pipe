@@ -115,6 +115,20 @@ class PipePipeEngine : ExtractionEngine {
 
         if (!initialized) {
             NewPipe.init(PipePipeDownloader(), localization, country)
+
+            /*
+             * PipeLocalPlayerDecoder is deliberately NOT registered here.
+             *
+             * It deciphers on device so a cold extraction never reaches
+             * api.pipepipe.dev (Gotcha 5), but on the current pins it breaks
+             * the mweb/SABR pass: with it registered every SABR session failed
+             * ("Could not get any stream", or no progress for 30 s), and with
+             * it off they all passed. Plain visionos extraction works either
+             * way. See docs/DIVERGENCES.md §13 for the measurement; re-enable
+             * with YoutubeApiDecoder.setLocalDecoder(PipeLocalPlayerDecoder())
+             * once the SABR suite passes with it on.
+             */
+
             initialized = true
             return
         }

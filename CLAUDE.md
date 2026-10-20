@@ -39,7 +39,9 @@ android/src/main/kotlin/ink/harsh/plugins/pipe/
 android/libs/                 built extractor jars — SHIPPED, generated, not hand-edited
 submodules/PipePipeExtractor  pinned upstream, pristine
 submodules/NewPipeExtractor   pinned upstream, pristine
+tools/js/                     readable source for the WebView assets — EDIT HERE
 tools/shade/                  relocates NewPipeExtractor into a private namespace
+tools/strenc/                 encrypts identifying string literals in the jars (see ENCRYPTED-STRINGS.md)
 tools/force-java17.init.gradle  toolchain override for PipePipe (see Gotcha 1)
 scripts/                      build / update / verify
 ```
@@ -51,18 +53,42 @@ yourself wanting to change extractor source, wrap it on our side instead.
 ## Build
 
 ```bash
-bun install                  # bun is the package manager, script runner and test runner
+bun install                  # bun ONLY — npm/pnpm are refused, see Gotcha 13
 bun run extractors:init      # git submodule update --init --recursive
 bun run extractors:build     # build both extractors -> android/libs/*.jar
-bun run build                # TypeScript + docgen
+bun run assets:build         # obfuscate tools/js -> android/src/main/assets
+bun run build                # assets + TypeScript + docgen
 bun run test                 # type-check the tests, then bun test
+bun run test:assets          # run the shipped, obfuscated WebView asset
 bun run verify:android       # compile the Android module
 ```
+
+**JDK 21, not 17 and not 25.** The window is narrow and both edges fail with
+errors that name neither Java nor the JDK: on 17 `capacitor-android` dies with
+`invalid source release: 21`, and on 25 Gradle 8.14.3's Groovy cannot compile a
+build script at all — `BUG! exception in phase 'semantic analysis' ...
+Unsupported class file major version 69`, reported against `settings.gradle`.
+That second one hides behind Gradle's compiled-script cache, so it appears the
+first time a settings file changes rather than when the JDK does.
+
+```bash
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+```
+
+This is independent of Gotcha 1: that is about the *bytecode the extractors
+emit*, this is about the JVM Gradle itself runs on.
 
 `android/libs/*.jar` is generated but **committed and published** — npm tarballs
 cannot carry git submodules, so a consuming app never sees `submodules/`. The
 submodules are the development path; `android/libs/` is the published path.
 Regenerate with `bun run extractors:build`, never by hand.
+
+`android/src/main/assets/*.js` follows the same rule for the same reason. The
+readable source is `tools/js/`; the shipped asset is the obfuscated output of
+`bun run assets:build`, committed because a consuming app builds from our tree
+and never runs our scripts. **Edit `tools/js/`, never the asset.** Keeping the
+source readable is what makes re-syncing a PipePipeClient fix a translation
+rather than an excavation.
 
 ## Updating the extractors
 
@@ -89,7 +115,7 @@ on. Add to them whenever the wrapper starts calling something new.
 [docs/DIVERGENCES.md](docs/DIVERGENCES.md) records every point where our code forks to
 handle the two engines differently, with file and symbol anchors and what to
 re-check per dependency. `scripts/check-divergences.sh` asserts them against both
-submodules' source (41 checks), and `update-extractors.sh` runs it before
+submodules' source (48 checks), and `update-extractors.sh` runs it before
 rebuilding, rolling the pins back if anything changed.
 
 ```bash
@@ -211,16 +237,30 @@ minSdk 24, compileSdk 36, targetSdk 36, AGP 8.13.0, Gradle 8.14.3, Kotlin
 2.3.21. Capacitor **8.5 is iOS-only** (UIScene lifecycle) — no Android impact
 here, and this plugin has no iOS side at all.
 
-### 5. PipePipe's YouTube path depends on a remote service
+### 5. PipePipe's YouTube path depends on a remote service — unless we intervene
 
 PipePipe replaced NewPipe's local Rhino execution with
 `YoutubeApiDecoder.decodeSignature(...)` against a **PipePipe-hosted** decoder.
-Signature and `n`-parameter deciphering therefore require reaching their
-infrastructure. NewPipe still deciphers locally in Rhino.
+Left alone, the *first outbound request of a cold extraction* goes to
+`api.pipepipe.dev/decoder/latest-player` — before YouTube — because the signature
+timestamp is needed to build the InnerTube payload. Cached 24h thereafter.
 
-This is the main reason the fallback earns its keep: the two engines fail for
-genuinely different reasons. It is also a privacy consideration worth surfacing
-to users.
+`PipeLocalPlayerDecoder` is written to close that hole: it implements PipePipe's
+`YoutubeJavaScriptDecoder` on top of the relocated NewPipe fork, so deciphering
+happens on device and the API is never called. **It is not registered today**:
+with it on, the mweb/SABR pass returned no streams on the current pins
+(DIVERGENCES.md §13, 2026-10-20), so the remote API is still in use. See DIVERGENCES.md §13 — it is
+the one file that imports both namespaces, and the borrowed-video-ID and
+synthetic-`playerId` caveats there are load bearing.
+
+The remote path remains as PipePipe's own fallback, so this is a preference, not
+a guarantee. **If the local decoder throws even once, PipePipe unregisters it
+permanently** and the process silently reverts to the API — no log, no failed
+build. `LocalPlayerDecoderTest.extractionNeverContactsPipePipesApi` asserts on
+the URLs actually requested, which is the only way to tell the two apart.
+
+The two engines still fail for genuinely different reasons, which is why the
+fallback earns its keep.
 
 ### 6. SABR is a session, not a URL
 
@@ -381,6 +421,18 @@ itself. Run `bun install` inside `example-app/`. Verify with:
 ```bash
 ls -la example-app/node_modules | grep capacitor-pipe   # -> ../..
 ```
+
+An inode comparison is the check that cannot be fooled — a copy passes a casual
+`ls`:
+
+```bash
+stat -f "%i %N" example-app/node_modules/capacitor-pipe/package.json package.json
+```
+
+Related: `android/capacitor.settings.gradle` is generated and hardcodes the
+node_modules layout, so it still pointed into `node_modules/.pnpm/...` after the
+switch. Run `bunx cap update android` after changing package manager, or the
+Android build fails with "No variants exist" for `:capacitor-android`.
 
 ### 14. PipePipeClient lives on Codeberg
 
@@ -652,6 +704,38 @@ does not auto-hide). And do not take uiautomator's `clickable="false"` on the
 speed and quality chips as evidence: it reports that while the chips work.
 What settled it was a pointer probe showing the tap reaching the chip and its
 `onClick` firing — the Gotcha 22 lesson again.
+
+### 30. String encryption depends on a javac flag that leaves no trace when it fails
+
+`tools/strenc` hides identifying string literals in the extractor jars, so a
+`strings`/grep over a release APK does not announce a YouTube extractor. It
+rewrites `ldc` and `ConstantValue` — the two forms a literal normally takes.
+
+The trap: since Java 9, `a + b` compiles to `invokedynamic
+makeConcatWithConstants`, and the literal parts move into the `BootstrapMethods`
+constant pool, which is **neither** form. `strenc` cannot see them, so
+`"https://www.youtube.com/…" + id` sails through in plaintext — and roughly half
+the identifying strings are concatenations. Nothing errors; the APK just still
+greps positive.
+
+`tools/force-java17.init.gradle` fixes it upstream of `strenc` with
+`-XDstringConcat=inline`, forcing pre-9 `StringBuilder` concat that emits `ldc`.
+Because it is a `-XD` internal flag, a JDK that drops it reverts concat to
+invokedynamic and the leak returns silently. `scripts/check-apk-obfuscation.sh`
+over the shipped APK is the only backstop — keep it wired into your APK checks.
+
+Two more things this cost, worth knowing before you touch it:
+
+- **It only covers the jars.** The plugin's own Kotlin ships as source and is
+  compiled by the consumer, so `strenc` never sees it. Those strings are handled
+  at source instead: renamed where "Youtube" was redundant, or wrapped in
+  `PipeObf.d(...)`, with the plaintext listed in `tools/strenc/kotlin-strings.md`
+  and `PipeObfTest` checking the round trip. See ENCRYPTED-STRINGS.md.
+- **The protobuf keep rule had to allow renaming.** `-keep` blocks obfuscation
+  as well as shrinking, so it was pinning `…services.youtube.protos.video.Xtags`
+  into the dex as a plaintext class name that no string encryption could reach.
+  It is now `-keep,allowobfuscation` + a `-keepclassmembers` for the fields
+  protobuf-lite actually reflects on.
 
 ---
 

@@ -19,6 +19,8 @@
  */
 package ink.harsh.plugins.pipe.youtube
 
+import ink.harsh.plugins.pipe.util.PipeObf
+
 import android.content.Context
 import android.util.Log
 import com.grack.nanojson.JsonObject
@@ -38,7 +40,7 @@ import java.util.concurrent.atomic.AtomicReference
 object PipeBotGuardMinter {
     private lateinit var appContext: Context
     private val initializationExecutor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "YoutubePoTokenWarmup").apply { isDaemon = true }
+        Thread(runnable, "PipePoTokenWarmup").apply { isDaemon = true }
     }
     private val initializationLock = Any()
     @Volatile
@@ -54,7 +56,7 @@ object PipeBotGuardMinter {
             YoutubePoTokenBinding.CONTENT -> state.session.mint(videoId)
             YoutubePoTokenBinding.SESSION -> requireNotNull(state.sessionPoToken).clone()
             YoutubePoTokenBinding.NONE -> throw SabrProtocolException(
-                "YouTube home does not enable a supported PO token binding",
+                PipeObf.d("\u0002\u0033\u0028\u000a\u002a\u0002\u0004\u0042\u000b\u000b\u0008\u0003\u0047\u000c\u0006\u000f\u0018\u004c\u0003\u0001\u001b\u0050\u0014\u001c\u0012\u0016\u0019\u0013\u0057\u0019\u0059\u0009\u000e\u000c\u000d\u0011\u000d\u00f4\u00e4\u00e6\u00a3\u00d4\u00ca\u00a6\u00f3\u00e7\u00e2\u00ef\u00e5\u00ac\u00ef\u00e7\u00e1\u00f4\u00f8\u00fc\u00f4"),
             )
         }
         return YoutubePoTokenResult(
@@ -124,7 +126,7 @@ object PipeBotGuardMinter {
                 val bootstrap = fetchHomeBootstrap(loginCookies)
                 if (bootstrap.binding == YoutubePoTokenBinding.NONE) {
                     throw SabrProtocolException(
-                        "YouTube home does not enable a supported PO token binding",
+                        PipeObf.d("\u0002\u0033\u0028\u000a\u002a\u0002\u0004\u0042\u000b\u000b\u0008\u0003\u0047\u000c\u0006\u000f\u0018\u004c\u0003\u0001\u001b\u0050\u0014\u001c\u0012\u0016\u0019\u0013\u0057\u0019\u0059\u0009\u000e\u000c\u000d\u0011\u000d\u00f4\u00e4\u00e6\u00a3\u00d4\u00ca\u00a6\u00f3\u00e7\u00e2\u00ef\u00e5\u00ac\u00ef\u00e7\u00e1\u00f4\u00f8\u00fc\u00f4"),
                     )
                 }
                 val session = PersistentMintSession.create(
@@ -135,7 +137,7 @@ object PipeBotGuardMinter {
                     val sessionPoToken = if (bootstrap.binding == YoutubePoTokenBinding.SESSION) {
                         val sessionBinding = if (loggedIn) {
                             bootstrap.dataSyncId ?: throw SabrProtocolException(
-                                "Authenticated YouTube home has no Data Sync ID",
+                                PipeObf.d("\u001a\u0029\u0029\u0036\u003a\u000e\u0015\u000b\u0000\u0005\u0011\u0003\u0003\u0048\u0030\u0005\u001e\u0038\u0018\u000c\u000a\u0050\u0019\u001d\u001e\u0011\u0055\u001e\u0016\u000b\u0059\u0014\u0014\u005c\u0039\u001f\u000b\u00e1\u00a1\u00d1\u00fa\u00ea\u00e6\u00a6\u00ce\u00cc"),
                             )
                         } else {
                             bootstrap.visitorData
@@ -162,7 +164,7 @@ object PipeBotGuardMinter {
         }
     }
 
-    private fun fetchHomeBootstrap(loginCookies: String?): YoutubePageAttestationBootstrap {
+    private fun fetchHomeBootstrap(loginCookies: String?): PageAttestationBootstrap {
         val body = PipeAttestationHttp.get(
             YOUTUBE_HOME,
             mapOf(
@@ -171,11 +173,11 @@ object PipeBotGuardMinter {
                 "User-Agent" to listOf(PipeWebViewRuntime.USER_AGENT),
             ),
         )
-        return parseYoutubePageAttestationBootstrap(body)
+        return parsePageAttestationBootstrap(body)
     }
 
     private data class MintState(
-        val bootstrap: YoutubePageAttestationBootstrap,
+        val bootstrap: PageAttestationBootstrap,
         val session: PersistentMintSession,
         val sessionPoToken: ByteArray?,
     )
@@ -201,15 +203,16 @@ object PipeBotGuardMinter {
     @JvmStatic
     var youtubeLoginCookies: String? = null
 
-    private const val TAG = "YoutubeGlobalPoToken"
-    private const val YOUTUBE_HOME = "https://www.youtube.com"
+    private const val TAG = "PipeGlobalPoToken"
+    // Not `const`: obfuscated host decodes at runtime (see ENCRYPTED-STRINGS.md).
+    private val YOUTUBE_HOME = PipeObf.d("\u0033\u0028\u0029\u002e\u002c\u005a\u004e\u004d\u0014\u0013\u0012\u0048\u001e\u0007\u001c\u001e\u001e\u000e\u0008\u0040\u000c\u001f\u001c")
     private const val ANONYMOUS_COOKIE = "PREF=hl=en&gl=US"
 }
 
 private class PersistentMintSession private constructor(
     context: Context,
     private val initialization: InitWaiter,
-    private val bootstrap: YoutubePageAttestationBootstrap,
+    private val bootstrap: PageAttestationBootstrap,
 ) : Closeable {
     private val runtime = PipeWebViewRuntime.get(context.applicationContext)
     private val sessionId = runtime.registerSabrLocalDomCallbacks(Callbacks())
@@ -475,7 +478,7 @@ private class PersistentMintSession private constructor(
         @Throws(SabrProtocolException::class)
         fun create(
             context: Context,
-            bootstrap: YoutubePageAttestationBootstrap,
+            bootstrap: PageAttestationBootstrap,
         ): PersistentMintSession {
             val initialization = InitWaiter()
             val session = PersistentMintSession(

@@ -15,6 +15,19 @@
  * same installed JDK means contributors do not need a second JDK just to build
  * one submodule. 11 -> 17 raises its class files to major 61, still under the
  * AGP 8 ceiling.
+ *
+ * `-XDstringConcat=inline` is here for the string-encryption step, not the
+ * toolchain. Since Java 9, `a + b` compiles to an `invokedynamic
+ * makeConcatWithConstants` whose literal parts live in the BootstrapMethods
+ * constant pool, NOT as `ldc` instructions — so `tools/strenc` cannot see or
+ * encrypt them, and `https://www.youtube.com/...` survives in the dex. This
+ * javac flag restores pre-9 `StringBuilder` concatenation, which loads every
+ * literal via `ldc`, exactly what the encryptor rewrites. Verified: strenc goes
+ * from missing ~half the identifying strings to catching all of them.
+ *
+ * It is a `-XD` internal flag, so keep it in sync with the encryptor: if a JDK
+ * ever drops it, string concat reverts to invokedynamic and the leak returns
+ * silently. `scripts/check-apk-obfuscation.sh` is the backstop that catches it.
  */
 gradle.projectsEvaluated {
     rootProject.allprojects { p ->
@@ -27,6 +40,7 @@ gradle.projectsEvaluated {
         }
         p.tasks.withType(JavaCompile).configureEach {
             options.release = 17
+            options.compilerArgs += ['-XDstringConcat=inline']
         }
     }
 }

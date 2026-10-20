@@ -18,7 +18,15 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
+            /*
+             * Deliberately ON, unlike the Capacitor template's default.
+             *
+             * R8 runs in the CONSUMING app, never in the plugin, so a release
+             * build here is the only place the plugin's consumer keep rules are
+             * ever exercised. With this off, a shrinking bug in capacitor-pipe
+             * is invisible until it reaches somebody's production APK.
+             */
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
