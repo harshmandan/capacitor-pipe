@@ -10,12 +10,69 @@ Formerly `capacitor-npe`.
 
 ## Install
 
+Not published to npm yet. Install it from this GitHub repository: build it once,
+pack it into a tarball, and add the tarball to your app.
+
+Requires Capacitor 8 (minSdk 24, compileSdk 36, JDK 21) in your app, and
+[bun](https://bun.sh) to build the plugin.
+
+**1. Build and pack the plugin**
+
 ```bash
-npm install capacitor-pipe
-npx cap sync
+git clone https://github.com/harshmandan/capacitor-pipe.git
+cd capacitor-pipe
+bun install
+bun run build
+bun pm pack
 ```
 
-Requires Capacitor 8 (minSdk 24, compileSdk 36, JDK 21).
+This writes `capacitor-pipe-<version>.tgz` in the repository root.
+
+**2. Add it to your Capacitor app**
+
+With bun:
+
+```bash
+bun add /path/to/capacitor-pipe/capacitor-pipe-1.0.0.tgz
+npx cap sync android
+```
+
+With npm, pass `--ignore-scripts`:
+
+```bash
+npm install --ignore-scripts /path/to/capacitor-pipe/capacitor-pipe-1.0.0.tgz
+npx cap sync android
+```
+
+To keep builds reproducible, copy the `.tgz` into your app (for example
+`vendor/`) and install it from there, so the dependency doesn't point at a
+checkout on one machine.
+
+**3. Update**
+
+```bash
+cd capacitor-pipe
+git pull
+bun install
+bun run build
+bun pm pack
+```
+
+Then rerun the install command from step 2 and `npx cap sync android`.
+
+### Why not `npm install github:harshmandan/capacitor-pipe`?
+
+It does not work, for two reasons:
+
+- `dist/` (the compiled JavaScript) is built, not committed, so a direct git
+  install has no entry point and `import { Pipe } from 'capacitor-pipe'` fails.
+- `package.json` has a `preinstall` check that refuses every package manager but
+  bun. It is meant for working in this repository, but npm also runs it when the
+  plugin is installed into your app. That is why npm needs `--ignore-scripts`
+  above. bun skips a dependency's install scripts by default.
+
+The Android extractor jars (`android/libs/`) and the WebView assets are
+committed, so the tarball has everything the native side needs.
 
 ## Extraction
 
