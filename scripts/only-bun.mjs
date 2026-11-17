@@ -17,12 +17,26 @@
  *
  * No dependency on `only-allow` — that would need npx, i.e. the thing we are
  * trying to keep out.
+ *
+ * The check applies only to this repository, never to an app that installs
+ * the plugin. npm runs a dependency's `preinstall` too, so this file is shipped
+ * in the package and steps aside there. A packed or published copy has no
+ * `bun.lock` (it is not in `files`), while a checkout always does — including
+ * the clone npm makes for `npm install github:...`, which should still fail
+ * loudly because `dist/` is not committed.
  */
+
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
+const isCheckout = existsSync(join(repo, "bun.lock"));
 
 const agent = process.env.npm_config_user_agent ?? "";
 const manager = agent.split("/")[0];
 
-if (manager && manager !== "bun") {
+if (isCheckout && manager && manager !== "bun") {
   console.error(`
   This repository uses bun.
 

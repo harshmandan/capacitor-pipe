@@ -434,6 +434,13 @@ node_modules layout, so it still pointed into `node_modules/.pnpm/...` after the
 switch. Run `bunx cap update android` after changing package manager, or the
 Android build fails with "No variants exist" for `:capacitor-android`.
 
+The bun-only `preinstall` guard (`scripts/only-bun.mjs`) is **shipped in the
+package** and must stay in `files`: npm runs a dependency's `preinstall` in the
+consuming app, and a missing script fails the app's install with
+`MODULE_NOT_FOUND`. The guard enforces bun only when `bun.lock` sits next to it,
+which is true in a checkout and never in a packed copy. Never add `bun.lock` to
+`files`, or every npm user is refused.
+
 ### 14. PipePipeClient lives on Codeberg
 
 The reference SABR player integration is **not** on GitHub. `PipePipe` on GitHub

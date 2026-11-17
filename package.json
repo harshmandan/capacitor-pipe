@@ -11,6 +11,7 @@
     "android/libs/",
     "android/build.gradle",
     "android/proguard-rules.pro",
+    "scripts/only-bun.mjs",
     "dist/",
     "LICENSE"
   ],

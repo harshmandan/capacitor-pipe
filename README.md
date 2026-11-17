@@ -30,17 +30,8 @@ This writes `capacitor-pipe-<version>.tgz` in the repository root.
 
 **2. Add it to your Capacitor app**
 
-With bun:
-
 ```bash
-bun add /path/to/capacitor-pipe/capacitor-pipe-1.0.0.tgz
-npx cap sync android
-```
-
-With npm, pass `--ignore-scripts`:
-
-```bash
-npm install --ignore-scripts /path/to/capacitor-pipe/capacitor-pipe-1.0.0.tgz
+npm install /path/to/capacitor-pipe/capacitor-pipe-1.0.0.tgz   # or: bun add <same path>
 npx cap sync android
 ```
 
@@ -62,14 +53,10 @@ Then rerun the install command from step 2 and `npx cap sync android`.
 
 ### Why not `npm install github:harshmandan/capacitor-pipe`?
 
-It does not work, for two reasons:
-
-- `dist/` (the compiled JavaScript) is built, not committed, so a direct git
-  install has no entry point and `import { Pipe } from 'capacitor-pipe'` fails.
-- `package.json` has a `preinstall` check that refuses every package manager but
-  bun. It is meant for working in this repository, but npm also runs it when the
-  plugin is installed into your app. That is why npm needs `--ignore-scripts`
-  above. bun skips a dependency's install scripts by default.
+`dist/` (the compiled JavaScript) is built, not committed, so a direct git
+install has no entry point and `import { Pipe } from 'capacitor-pipe'` fails.
+npm refuses it outright: a git checkout carries this repository's bun-only
+`preinstall` check, which only steps aside in a packed or published copy.
 
 The Android extractor jars (`android/libs/`) and the WebView assets are
 committed, so the tarball has everything the native side needs.
